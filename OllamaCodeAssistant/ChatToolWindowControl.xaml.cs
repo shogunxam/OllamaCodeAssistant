@@ -76,9 +76,8 @@ namespace OllamaCodeAssistant {
           userPrompt = userPrompt.Replace("@doc", GetActiveDocumentText());
         }
 
-        // Add any selected code for context
-        string selectedCode = GetTruncatedSelectedText();
-        userPrompt = BuildPrompt(userPrompt, selectedCode);
+        // Add context to the prompt
+        userPrompt = BuildPrompt(userPrompt);
 
         // Add our new message to the chat history
         _chatHistory.Add(new ChatMessage(ChatRole.User, userPrompt));
@@ -222,9 +221,16 @@ namespace OllamaCodeAssistant {
       }
     }
 
-    private string BuildPrompt(string userInput, string selectedCode) {
-      if (string.IsNullOrEmpty(selectedCode))
+    private string BuildPrompt(string userInput) {
+      string code;
+
+      if (ContextIncludeSelection.IsChecked == true) {
+        code = GetTruncatedSelectedText();
+      } else if (ContextIncludeFile.IsChecked == true) {
+        code = GetActiveDocumentText();
+      } else {
         return userInput;
+      }
 
       string language = GetLanguageFromFile();
       string langHint = language != null ? $"The following is a {language} code snippet:\n" : "The following is a code snippet:\n";
@@ -232,17 +238,17 @@ namespace OllamaCodeAssistant {
       // Handle some common cases
       string normalized = userInput.Trim().ToLowerInvariant();
       if (normalized == "explain" || normalized.StartsWith("explain this")) {
-        return $"Please explain what this code does.\n\n{langHint}```\n{selectedCode}\n```";
+        return $"Please explain what this code does.\n\n{langHint}```\n{code}\n```";
       }
       if (normalized.StartsWith("refactor")) {
-        return $"Refactor this code to be cleaner or more efficient.\n\n{langHint}```\n{selectedCode}\n```";
+        return $"Refactor this code to be cleaner or more efficient.\n\n{langHint}```\n{code}\n```";
       }
       if (normalized.StartsWith("add comments") || normalized.Contains("document")) {
-        return $"Add inline comments to explain the logic in this code.\n\n{langHint}```\n{selectedCode}\n```";
+        return $"Add inline comments to explain the logic in this code.\n\n{langHint}```\n{code}\n```";
       }
 
       // Default case — just include the code below the input
-      return $"{userInput}\n\n{langHint}```\n{selectedCode}\n```";
+      return $"{userInput}\n\n{langHint}```\n{code}\n```";
     }
 
     private string LoadHtmlFromResource() {
@@ -263,7 +269,15 @@ namespace OllamaCodeAssistant {
         MessageBox.Show($"Error loading WebView2: {ex}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
       }
 
+      TextSelectionListener.SelectionChanged += TextViewTrackerSelectionChanged;
+
       UserInputTextBox.Focus();
+    }
+
+    private void TextViewTrackerSelectionChanged(object sender, string e) {
+      Dispatcher.BeginInvoke((Action)(() => {
+        ContextIncludeSelection.IsChecked = e != null && e.Length > 0;
+      }));
     }
 
     private async Task InitializeWebViewAsync(Microsoft.Web.WebView2.Wpf.WebView2 webView) {

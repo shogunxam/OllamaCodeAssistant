@@ -17,6 +17,7 @@
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <!-- Chat Display -->
@@ -33,8 +34,21 @@
                  Margin="5" />
     </Border>
 
+    <!-- Context Controls -->
+    <StackPanel Orientation="Horizontal"
+                Grid.Row="2">
+      <TextBlock Text="Context:"
+                 VerticalAlignment="Center" />
+      <ToggleButton x:Name="ContextIncludeSelection"
+                    Content="Selected Text"
+                    Margin="5 0 0 0" />
+      <ToggleButton x:Name="ContextIncludeFile"
+                    Content="Current File"
+                    Margin="5 0 0 0" />
+    </StackPanel>
+
     <!-- User Input -->
-    <Grid Grid.Row="2">
+    <Grid Grid.Row="3">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
