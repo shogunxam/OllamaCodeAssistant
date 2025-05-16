@@ -57,6 +57,7 @@
     <Compile Include="Options\OllamaOptionsPage.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="ProjectContextHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="OllamaCodeAssistantPackage.cs" />
     <Compile Include="TextSelectionListener.cs" />
@@ -86,6 +87,13 @@
     </PackageReference>
     <PackageReference Include="Markdig">
       <Version>0.41.1</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Build">
+      <Version>17.14.8</Version>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Build.Locator">
+      <Version>1.9.1</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.AI.Ollama">
       <Version>9.5.0-preview.1.25262.9</Version>
