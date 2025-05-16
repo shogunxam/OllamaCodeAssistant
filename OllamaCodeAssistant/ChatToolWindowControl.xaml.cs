@@ -89,7 +89,6 @@ namespace OllamaCodeAssistant {
         // Read the streaming result from the chat client and update the UI
         var fullResponse = new StringBuilder();
         Debug.WriteLine($"Final Prompt: {userPrompt}");
-        Debug.WriteLine("Creating cancellation token source");
 
         var options = Package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
         string url = options.OllamaApiUrl;
@@ -110,14 +109,12 @@ namespace OllamaCodeAssistant {
         try {
           while (await enumerator.MoveNextAsync()) {
             if (_cancellationTokenSource.Token.IsCancellationRequested) {
-              Debug.WriteLine("Cancellation requested.");
               AppendMessageToUI("\n\nQuery Canceled");
               break;
             }
 
             var response = enumerator.Current;
             if (response == null) {
-              Debug.WriteLine("Response is null.");
               AppendMessageToUI("\n\nResponse Was Empty");
               break;
             }
@@ -127,7 +124,6 @@ namespace OllamaCodeAssistant {
             AppendMessageToUI(response.Text);
           }
         } catch (OperationCanceledException) {
-          Debug.WriteLine("Streaming cancelled by user.");
           AppendMessageToUI("\n\nQuery Canceled");
         } finally {
           await enumerator.DisposeAsync();
@@ -141,7 +137,6 @@ namespace OllamaCodeAssistant {
         UserInputTextBox.IsEnabled = true;
         UserInputTextBox.Focus();
         SendButton.Content = "Send";
-        Debug.WriteLine("Destroying cancellation token source");
         _cancellationTokenSource = null;
       }
     }
