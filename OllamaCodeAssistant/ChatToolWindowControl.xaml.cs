@@ -206,17 +206,27 @@ namespace OllamaCodeAssistant {
       }
     }
 
+    public static List<(string FileName, string Text)> GetOpenDocuments() {
+      var result = new List<(string, string)>();
+
+      ThreadHelper.ThrowIfNotOnUIThread();
+      var dte = (DTE)Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(DTE));
+      if (dte == null) return result;
+
+      foreach (Document doc in dte.Documents) {
+        if (doc.Object("TextDocument") is TextDocument textDoc) {
+          EditPoint startPoint = textDoc.StartPoint.CreateEditPoint();
+          string content = startPoint.GetText(textDoc.EndPoint);
+
+          result.Add((doc.FullName, content));
+        }
+      }
+
+      return result;
+    }
+
     private string BuildPrompt(string userInput) {
       ThreadHelper.ThrowIfNotOnUIThread();
-
-      string code;
-      if (ContextIncludeSelection.IsChecked == true) {
-        code = GetTruncatedSelectedText();
-      } else if (ContextIncludeFile.IsChecked == true) {
-        code = GetActiveDocumentText();
-      } else {
-        return userInput;
-      }
 
       var dte = (DTE)Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(DTE));
 
@@ -226,25 +236,45 @@ namespace OllamaCodeAssistant {
         projectContext = ProjectContextHelper.GetProjectContext(activeProject);
       }
 
-      string projectHint = projectContext != null ? $"The user is editing code in a Visual Studio project with the following properties:\n{projectContext}\n\n" : string.Empty;
+      var finalPrompt = new StringBuilder();
 
-      string language = GetLanguageFromFile();
-      string langHint = language != null ? $"The following is a {language} code snippet:\n" : "The following is a code snippet:\n";
-
-      // Handle some common cases
-      string normalized = userInput.Trim().ToLowerInvariant();
-      if (normalized == "explain" || normalized.StartsWith("explain this")) {
-        return $"Please explain what this code does.\n\n{projectHint}{langHint}```\n{code}\n```";
-      }
-      if (normalized.StartsWith("refactor")) {
-        return $"Refactor this code to be cleaner or more efficient.\n\n{projectHint}{langHint}```\n{code}\n```";
-      }
-      if (normalized.StartsWith("add comments") || normalized.Contains("document")) {
-        return $"Add inline comments to explain the logic in this code.\n\n{projectHint}{langHint}```\n{code}\n```";
+      finalPrompt.AppendLine("You are an AI code assistant running in Visual Studio.");
+      if (activeProject != null) {
+        finalPrompt.AppendLine($"The active project is named '{activeProject.Name}' and has the following properties:");
+        finalPrompt.AppendLine(projectContext.ToString());
+      } else {
+        finalPrompt.AppendLine("The user is editing code in a Visual Studio project.");
       }
 
-      // Default case — just include the code below the input
-      return $"{userInput}\n\n{projectHint}{langHint}```\n{code}\n```";
+      finalPrompt.AppendLine("\n\n");
+
+      // Include the users selected context
+      if (ContextIncludeSelection.IsChecked == true) {
+        finalPrompt.AppendLine($"Here is the relevant code:\n\n```{GetTruncatedSelectedText()}```");
+      } else if (ContextIncludeFile.IsChecked == true) {
+        finalPrompt.AppendLine($"The relevant code is in file '{dte.ActiveDocument.Name}' which contains :\n\n```{GetActiveDocumentText()}```");
+      } else if (ContextIncludeAllOpenFile.IsChecked == true) {
+        finalPrompt.AppendLine("Please use the following files for context:");
+        foreach (var doc in GetOpenDocuments()) {
+          finalPrompt.AppendLine($"File '{doc.FileName}':\n```{doc.Text}```\n\n");
+        }
+      }
+
+      finalPrompt.AppendLine("\n\n### USER REQUEST");
+
+      // Expand the user's prompt to include common commands
+      string normalizedUserInput = userInput.Trim().ToLowerInvariant();
+      if (normalizedUserInput == "explain" || normalizedUserInput.StartsWith("explain this")) {
+        finalPrompt.AppendLine("Please explain what this code does.");
+      } else if (normalizedUserInput.StartsWith("refactor")) {
+        finalPrompt.AppendLine("Refactor this code to be cleaner or more efficient.");
+      } else if (normalizedUserInput.StartsWith("add comments") || normalizedUserInput.Contains("document")) {
+        finalPrompt.AppendLine("Add inline comments to explain the logic in this code.");
+      } else {
+        finalPrompt.AppendLine(userInput);
+      }
+
+      return finalPrompt.ToString();
     }
 
     private string LoadHtmlFromResource() {

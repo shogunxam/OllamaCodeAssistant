@@ -45,6 +45,9 @@
       <ToggleButton x:Name="ContextIncludeFile"
                     Content="Current File"
                     Margin="5 0 0 0" />
+      <ToggleButton x:Name="ContextIncludeAllOpenFile"
+                    Content="All Open Files"
+                    Margin="5 0 0 0" />
     </StackPanel>
 
     <!-- User Input -->
