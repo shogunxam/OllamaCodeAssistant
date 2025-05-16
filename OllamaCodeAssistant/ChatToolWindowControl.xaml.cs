@@ -38,13 +38,17 @@ namespace OllamaCodeAssistant {
     }
 
     private void DisplayError(string message) {
-      ErrorDisplayBorder.Visibility = Visibility.Visible;
-      ErrorDisplayTextBlock.Text = message;
+      Dispatcher.BeginInvoke((Action)(() => {
+        ErrorDisplayBorder.Visibility = Visibility.Visible;
+        ErrorDisplayTextBlock.Text = message;
+      }));
     }
 
     private void ClearError() {
-      ErrorDisplayTextBlock.Text = string.Empty;
-      ErrorDisplayBorder.Visibility = Visibility.Collapsed;
+      Dispatcher.BeginInvoke((Action)(() => {
+        ErrorDisplayTextBlock.Text = string.Empty;
+        ErrorDisplayBorder.Visibility = Visibility.Collapsed;
+      }));
     }
 
     private async void SendButtonClicked(object sender, RoutedEventArgs e) {
@@ -266,7 +270,7 @@ namespace OllamaCodeAssistant {
       try {
         await InitializeWebViewAsync(MarkdownWebView);
       } catch (Exception ex) {
-        MessageBox.Show($"Error loading WebView2: {ex}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        DisplayError($"Error loading WebView2: {ex.Message}");
       }
 
       TextSelectionListener.SelectionChanged += TextViewTrackerSelectionChanged;
@@ -285,7 +289,7 @@ namespace OllamaCodeAssistant {
 
       string userDataFolder = Path.Combine(
           Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-          "YourExtensionName", "WebView2UserData");
+          "OllamaCodeAssistant", "WebView2UserData");
 
       var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder);
 
@@ -293,7 +297,7 @@ namespace OllamaCodeAssistant {
 
       webView.CoreWebView2InitializationCompleted += (s, e) => {
         if (!e.IsSuccess) {
-          MessageBox.Show($"WebView2 init failed: {e.InitializationException.Message}");
+          DisplayError($"WebView2 init failed: {e.InitializationException.Message}");
         }
       };
 
