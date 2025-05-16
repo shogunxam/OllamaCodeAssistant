@@ -76,11 +76,6 @@ namespace OllamaCodeAssistant {
         AppendMessageToUI($"\n\nYou: {userPrompt}");
         AppendMessageToUI($"\n\nAssistant: ");
 
-        // Substitute in the active document
-        if (userPrompt.Contains("@doc")) {
-          userPrompt = userPrompt.Replace("@doc", GetActiveDocumentText());
-        }
-
         // Add context to the prompt
         userPrompt = BuildPrompt(userPrompt);
 
@@ -155,16 +150,6 @@ namespace OllamaCodeAssistant {
       TextDocument textDoc = activeDoc?.Object("TextDocument") as TextDocument;
       EditPoint start = textDoc?.StartPoint.CreateEditPoint();
       return start?.GetText(textDoc.EndPoint);
-    }
-
-    private string GetSelectedText() {
-      ThreadHelper.ThrowIfNotOnUIThread();
-      DTE2 dte = (DTE2)ServiceProvider.GlobalProvider.GetService(typeof(DTE));
-      if (dte?.ActiveDocument?.Selection is TextSelection selection) {
-        string text = selection.Text;
-        return string.IsNullOrWhiteSpace(text) ? null : text;
-      }
-      return null;
     }
 
     private string GetTruncatedSelectedText() {
