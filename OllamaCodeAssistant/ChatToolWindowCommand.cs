@@ -82,9 +82,9 @@ namespace OllamaCodeAssistant {
           throw new NotSupportedException("Cannot create tool window");
         }
 
-        if (window is ChatToolWindow chatToolWindow && this.package is OllamaCodeAssistantPackage ollamaPackage) {
-          chatToolWindow.Package = ollamaPackage;
-        }
+        //if (window is ChatToolWindow chatToolWindow && this.package is OllamaCodeAssistantPackage ollamaPackage) {
+        //  chatToolWindow.Package = ollamaPackage;
+        //}
       });
     }
   }
