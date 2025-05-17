@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -133,7 +135,7 @@ namespace OllamaCodeAssistant {
 
       // Update the UI to indicate processing
       UserInputTextBox.Clear();
-      SendButton.Content = "Stop";
+      SubmitButton.Content = "Stop";
 
       try {
         // Display user message
@@ -146,13 +148,9 @@ namespace OllamaCodeAssistant {
 
         // Add our new message to the chat history
         _chatHistory.Add(new ChatMessage(ChatRole.User, userPrompt));
-
-        // Read the streaming result from the chat client and update the UI
-        var fullResponse = new StringBuilder();
         Debug.WriteLine($"Final Prompt: {userPrompt}");
 
-        var package = _chatToolWindow?.Package as OllamaCodeAssistantPackage;
-        var options = package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
+        OllamaOptionsPage options = GetExtensionOptions();
         string url = options.OllamaApiUrl;
         string model = options.DefaultModel;
 
@@ -165,32 +163,42 @@ namespace OllamaCodeAssistant {
           _chatClient = new OllamaChatClient(new Uri(url), model);
         }
 
+        // Read the streaming result from the chat client and update the UI
+        var fullResponse = new StringBuilder();
         _cancellationTokenSource = new CancellationTokenSource();
         var asyncEnumerable = _chatClient.GetStreamingResponseAsync(_chatHistory, cancellationToken: _cancellationTokenSource.Token);
         var enumerator = asyncEnumerable.GetAsyncEnumerator(_cancellationTokenSource.Token);
         try {
           while (await enumerator.MoveNextAsync()) {
             if (_cancellationTokenSource.Token.IsCancellationRequested) {
-              AppendMessageToUI("\n\nQuery Canceled");
               break;
             }
 
-            var response = enumerator.Current;
-            if (response == null) {
-              AppendMessageToUI("\n\nResponse Was Empty");
-              break;
-            }
-
+            // Append the response to the UI and the full response
+            var response = enumerator.Current ?? throw new ApplicationException("Chat response was null");
             fullResponse.Append(response.Text);
-
             AppendMessageToUI(response.Text);
           }
         } catch (OperationCanceledException) {
-          AppendMessageToUI("\n\nQuery Canceled");
+          // Handle cancellation gracefully
         } finally {
           await enumerator.DisposeAsync();
         }
 
+        // Ensure code block is closed if needed
+        int codeBlockCount = Regex.Matches(fullResponse.ToString(), "```").Count;
+        if (codeBlockCount % 2 != 0) {
+          AppendMessageToUI("\n```");
+          fullResponse.Append("\n```");
+        }
+
+        // Report if the query was canceled
+        if (_cancellationTokenSource.Token.IsCancellationRequested) {
+          fullResponse.Append("\n\n...This response was cut short because the user canceled the request.\n\n");
+          AppendMessageToUI("\n\nQuery Canceled");
+        }
+
+        // Add the assistant's response to the chat history
         _chatHistory.Add(new ChatMessage(ChatRole.Assistant, fullResponse.ToString()));
       } catch (Exception ex) {
         DisplayError(ex.Message);
@@ -198,11 +206,21 @@ namespace OllamaCodeAssistant {
         // Restore UI for next prompt
         UserInputTextBox.IsEnabled = true;
         UserInputTextBox.Focus();
-        SendButton.Content = "Send";
+        SubmitButton.Content = "Send";
         _cancellationTokenSource = null;
       }
     }
 
     #endregion Chat Logic
+
+    #region Helpers
+
+    private OllamaOptionsPage GetExtensionOptions() {
+      var package = _chatToolWindow?.Package as OllamaCodeAssistantPackage;
+      var options = package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
+      return options;
+    }
+
+    #endregion Helpers
   }
 }

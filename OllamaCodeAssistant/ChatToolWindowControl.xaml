@@ -60,7 +60,7 @@
                Margin="5" />
       <Button Content="Send"
               Click="SendButtonClicked"
-              Name="SendButton"
+              Name="SubmitButton"
               Grid.Column="1"
               Margin="5"
               IsDefault="True" />
