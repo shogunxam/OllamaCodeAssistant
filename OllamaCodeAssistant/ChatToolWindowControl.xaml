@@ -38,7 +38,8 @@
     <StackPanel Orientation="Horizontal"
                 Grid.Row="2">
       <TextBlock Text="Context:"
-                 VerticalAlignment="Center" />
+                 VerticalAlignment="Center"
+                 Margin="5 0 0 0"/>
       <ToggleButton x:Name="ContextIncludeSelection"
                     Content="Selected Text"
                     Margin="5 0 0 0" />
@@ -51,8 +52,11 @@
       <CheckBox Content="Render Markdown"
                 ToolTip="Toggle whether the converstion with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
                 Click="RenderMarkdownClicked"
+                Foreground="#FFFAFAFA"
+                Margin="5 0 0 0"
                 VerticalAlignment="Center"
-                IsChecked="True" />
+                IsChecked="True">
+      </CheckBox>
     </StackPanel>
 
     <!-- User Input -->
