@@ -10,7 +10,7 @@
              mc:Ignorable="d"
              d:DesignHeight="300"
              d:DesignWidth="300"
-             Loaded="MyToolWindow_Loaded"
+             Loaded="ControlLoaded"
              Name="MyToolWindow">
   <Grid>
     <Grid.RowDefinitions>

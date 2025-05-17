@@ -8,19 +8,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using EnvDTE;
-using EnvDTE80;
 using Microsoft.Extensions.AI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.Web.WebView2.Core;
-using OllamaCodeAssistant.Helpers;
 using OllamaCodeAssistant.Options;
 
 namespace OllamaCodeAssistant {
 
   public partial class ChatToolWindowControl : UserControl {
-    private const int MaxCodeLength = 1500;
-
+    private readonly ChatToolWindow _chatToolWindow;
     private readonly List<ChatMessage> _chatHistory = new List<ChatMessage>();
 
     private IChatClient _chatClient;
@@ -28,29 +24,13 @@ namespace OllamaCodeAssistant {
     private string _model;
     private CancellationTokenSource _cancellationTokenSource;
 
-    private readonly ChatToolWindow _chatToolWindow;
-
-    private OllamaCodeAssistantPackage Package => _chatToolWindow?.Package as OllamaCodeAssistantPackage;
-
     public ChatToolWindowControl(ChatToolWindow chatToolWindow) {
       _chatToolWindow = chatToolWindow;
       InitializeComponent();
       ClearError();
     }
 
-    private void DisplayError(string message) {
-      Dispatcher.BeginInvoke((Action)(() => {
-        ErrorDisplayBorder.Visibility = Visibility.Visible;
-        ErrorDisplayTextBlock.Text = message;
-      }));
-    }
-
-    private void ClearError() {
-      Dispatcher.BeginInvoke((Action)(() => {
-        ErrorDisplayTextBlock.Text = string.Empty;
-        ErrorDisplayBorder.Visibility = Visibility.Collapsed;
-      }));
-    }
+    #region Event Handlers
 
     private async void SendButtonClicked(object sender, RoutedEventArgs e) {
       ClearError();
@@ -77,7 +57,7 @@ namespace OllamaCodeAssistant {
         AppendMessageToUI($"\n\nAssistant: ");
 
         // Add context to the prompt
-        userPrompt = BuildPrompt(userPrompt);
+        userPrompt = PromptManager.BuildPrompt(userPrompt, ContextIncludeSelection.IsChecked == true, ContextIncludeFile.IsChecked == true, ContextIncludeAllOpenFile.IsChecked == true);
 
         // Add our new message to the chat history
         _chatHistory.Add(new ChatMessage(ChatRole.User, userPrompt));
@@ -86,7 +66,8 @@ namespace OllamaCodeAssistant {
         var fullResponse = new StringBuilder();
         Debug.WriteLine($"Final Prompt: {userPrompt}");
 
-        var options = Package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
+        var package = _chatToolWindow?.Package as OllamaCodeAssistantPackage;
+        var options = package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
         string url = options.OllamaApiUrl;
         string model = options.DefaultModel;
 
@@ -137,158 +118,8 @@ namespace OllamaCodeAssistant {
       }
     }
 
-    private void AppendMessageToUI(string message) {
-      Dispatcher.BeginInvoke((Action)(() => {
-        MarkdownWebView.CoreWebView2.PostWebMessageAsString(message);
-      }));
-    }
-
-    private string GetActiveDocumentText() {
-      ThreadHelper.ThrowIfNotOnUIThread();
-      DTE2 dte = (DTE2)Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(DTE));
-      Document activeDoc = dte?.ActiveDocument;
-      TextDocument textDoc = activeDoc?.Object("TextDocument") as TextDocument;
-      EditPoint start = textDoc?.StartPoint.CreateEditPoint();
-      return start?.GetText(textDoc.EndPoint);
-    }
-
-    private string GetTruncatedSelectedText() {
-      ThreadHelper.ThrowIfNotOnUIThread();
-      DTE2 dte = (DTE2)ServiceProvider.GlobalProvider.GetService(typeof(DTE));
-      if (dte?.ActiveDocument?.Selection is TextSelection selection) {
-        string text = selection.Text;
-        if (string.IsNullOrWhiteSpace(text))
-          return null;
-
-        if (text.Length <= MaxCodeLength)
-          return text;
-
-        // Truncate cleanly at line breaks
-        var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        int totalLength = 0;
-        List<string> truncatedLines = new List<string>();
-
-        foreach (var line in lines) {
-          if (totalLength + line.Length > MaxCodeLength)
-            break;
-
-          truncatedLines.Add(line);
-          totalLength += line.Length + 1; // Include newline
-        }
-
-        truncatedLines.Add("// [Truncated due to length limits]");
-        return string.Join(Environment.NewLine, truncatedLines);
-      }
-
-      return null;
-    }
-
-    private string GetLanguageFromFile() {
-      ThreadHelper.ThrowIfNotOnUIThread();
-      DTE2 dte = (DTE2)ServiceProvider.GlobalProvider.GetService(typeof(DTE));
-      string fileName = dte?.ActiveDocument?.Name;
-
-      if (fileName == null) return null;
-
-      string ext = Path.GetExtension(fileName).ToLowerInvariant();
-
-      switch (ext) {
-        case ".cs": return "C#";
-        case ".ts": return "TypeScript";
-        case ".js": return "JavaScript";
-        case ".cpp": return "C++";
-        case ".h": return "C++ header";
-        case ".py": return "Python";
-        case ".html": return "HTML";
-        case ".css": return "CSS";
-        case ".json": return "JSON";
-        default: return null;
-      }
-    }
-
-    public static List<(string FileName, string Text)> GetOpenDocuments() {
-      var result = new List<(string, string)>();
-
-      ThreadHelper.ThrowIfNotOnUIThread();
-      var dte = (DTE)Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(DTE));
-      if (dte == null) return result;
-
-      foreach (Document doc in dte.Documents) {
-        if (doc.Object("TextDocument") is TextDocument textDoc) {
-          EditPoint startPoint = textDoc.StartPoint.CreateEditPoint();
-          string content = startPoint.GetText(textDoc.EndPoint);
-
-          result.Add((doc.FullName, content));
-        }
-      }
-
-      return result;
-    }
-
-    private string BuildPrompt(string userInput) {
-      ThreadHelper.ThrowIfNotOnUIThread();
-
-      var dte = (DTE)Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(DTE));
-
-      ProjectContext projectContext = null;
-      Project activeProject = dte?.ActiveDocument?.ProjectItem?.ContainingProject;
-      if (activeProject != null) {
-        projectContext = ProjectContextHelper.GetProjectContext(activeProject);
-      }
-
-      var finalPrompt = new StringBuilder();
-
-      finalPrompt.AppendLine("You are an AI code assistant running in Visual Studio.");
-      if (activeProject != null) {
-        finalPrompt.AppendLine($"The active project is named '{activeProject.Name}' and has the following properties:");
-        finalPrompt.AppendLine(projectContext.ToString());
-      } else {
-        finalPrompt.AppendLine("The user is editing code in a Visual Studio project.");
-      }
-
-      finalPrompt.AppendLine("\n\n");
-
-      // Include the users selected context
-      if (ContextIncludeSelection.IsChecked == true) {
-        finalPrompt.AppendLine($"Here is the relevant code:\n\n```{GetTruncatedSelectedText()}```");
-      } else if (ContextIncludeFile.IsChecked == true) {
-        finalPrompt.AppendLine($"The relevant code is in file '{dte.ActiveDocument.Name}' which contains :\n\n```{GetActiveDocumentText()}```");
-      } else if (ContextIncludeAllOpenFile.IsChecked == true) {
-        finalPrompt.AppendLine("Please use the following files for context:");
-        foreach (var doc in GetOpenDocuments()) {
-          finalPrompt.AppendLine($"File '{doc.FileName}':\n```{doc.Text}```\n\n");
-        }
-      }
-
-      finalPrompt.AppendLine("\n\n### USER REQUEST");
-
-      // Expand the user's prompt to include common commands
-      string normalizedUserInput = userInput.Trim().ToLowerInvariant();
-      if (normalizedUserInput == "explain" || normalizedUserInput.StartsWith("explain this")) {
-        finalPrompt.AppendLine("Please explain what this code does.");
-      } else if (normalizedUserInput.StartsWith("refactor")) {
-        finalPrompt.AppendLine("Refactor this code to be cleaner or more efficient.");
-      } else if (normalizedUserInput.StartsWith("add comments") || normalizedUserInput.Contains("document")) {
-        finalPrompt.AppendLine("Add inline comments to explain the logic in this code.");
-      } else {
-        finalPrompt.AppendLine(userInput);
-      }
-
-      return finalPrompt.ToString();
-    }
-
-    private string LoadHtmlFromResource() {
-      var assembly = Assembly.GetExecutingAssembly();
-      var resourceName = "OllamaCodeAssistant.Resources.ChatView.html";
-
-      using (var stream = assembly.GetManifestResourceStream(resourceName))
-      using (var reader = new StreamReader(stream)) {
-        return reader.ReadToEnd();
-      }
-    }
-
-    private async void MyToolWindow_Loaded(object sender, RoutedEventArgs e) {
-      Loaded -= MyToolWindow_Loaded; // Unsubscribe from the event to prevent multiple calls
+    private async void ControlLoaded(object sender, RoutedEventArgs e) {
+      Loaded -= ControlLoaded; // Unsubscribe from the event to prevent multiple calls
       try {
         await InitializeWebViewAsync(MarkdownWebView);
       } catch (Exception ex) {
@@ -305,6 +136,34 @@ namespace OllamaCodeAssistant {
         ContextIncludeSelection.IsChecked = e != null && e.Length > 0;
       }));
     }
+
+    #endregion Event Handlers
+
+    #region UI Helpers
+
+    private void DisplayError(string message) {
+      Dispatcher.BeginInvoke((Action)(() => {
+        ErrorDisplayBorder.Visibility = Visibility.Visible;
+        ErrorDisplayTextBlock.Text = message;
+      }));
+    }
+
+    private void ClearError() {
+      Dispatcher.BeginInvoke((Action)(() => {
+        ErrorDisplayTextBlock.Text = string.Empty;
+        ErrorDisplayBorder.Visibility = Visibility.Collapsed;
+      }));
+    }
+
+    private void AppendMessageToUI(string message) {
+      Dispatcher.BeginInvoke((Action)(() => {
+        MarkdownWebView.CoreWebView2.PostWebMessageAsString(message);
+      }));
+    }
+
+    #endregion UI Helpers
+
+    #region WebView2
 
     private async Task InitializeWebViewAsync(Microsoft.Web.WebView2.Wpf.WebView2 webView) {
       await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -325,5 +184,17 @@ namespace OllamaCodeAssistant {
 
       webView.NavigateToString(LoadHtmlFromResource());
     }
+
+    private string LoadHtmlFromResource() {
+      var assembly = Assembly.GetExecutingAssembly();
+      var resourceName = "OllamaCodeAssistant.Resources.ChatView.html";
+
+      using (var stream = assembly.GetManifestResourceStream(resourceName))
+      using (var reader = new StreamReader(stream)) {
+        return reader.ReadToEnd();
+      }
+    }
+
+    #endregion WebView2
   }
 }
