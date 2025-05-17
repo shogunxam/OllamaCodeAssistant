@@ -104,6 +104,5 @@ namespace OllamaCodeAssistant {
       activeProject = dte?.ActiveDocument?.ProjectItem?.ContainingProject;
       return activeProject != null;
     }
-
   }
 }

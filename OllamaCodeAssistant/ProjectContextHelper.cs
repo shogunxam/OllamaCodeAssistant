@@ -5,13 +5,16 @@ using Microsoft.Build.Evaluation;
 using Microsoft.VisualStudio.Shell;
 
 namespace OllamaCodeAssistant.Helpers {
+
   /// <summary>
   /// Represents a context for a Visual Studio project, including its target framework,
   /// language version, nullable reference types setting, and whether it is an SDK-style project.
   /// </summary>
   public class ProjectContext {
+
     // Properties to hold project context information
     public string TargetFramework { get; set; }
+
     public string LanguageVersion { get; set; }
     public string NullableContext { get; set; }
     public bool IsSdkStyle { get; set; }
@@ -33,6 +36,7 @@ namespace OllamaCodeAssistant.Helpers {
   /// Provides helper methods to retrieve and manipulate project context information.
   /// </summary>
   public static class ProjectContextHelper {
+
     /// <summary>
     /// Retrieves the context of a Visual Studio project, including its target framework,
     /// language version, nullable reference types setting, and whether it is an SDK-style project.

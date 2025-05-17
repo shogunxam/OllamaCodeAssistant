@@ -9,6 +9,7 @@ namespace OllamaCodeAssistant {
   [ContentType("text")] // or "code" for just code files
   [TextViewRole(PredefinedTextViewRoles.Document)]
   public class TextSelectionListener : IWpfTextViewCreationListener {
+
     public static event EventHandler<string> SelectionChanged;
 
     public void TextViewCreated(IWpfTextView textView) {
@@ -21,6 +22,4 @@ namespace OllamaCodeAssistant {
       };
     }
   }
-
-
 }
