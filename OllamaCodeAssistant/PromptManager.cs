@@ -7,6 +7,7 @@ namespace OllamaCodeAssistant {
     private const int MaxCodeLength = 1500;
 
     public static string BuildPrompt(string userInput, bool includeSelection, bool includeFile, bool includeOpenFiles) {
+      Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
       ProjectContext projectContext = null;
       if (DETService.TryGetActiveProject(out var activeProject)) {
         projectContext = ProjectContextHelper.GetProjectContext(activeProject);
