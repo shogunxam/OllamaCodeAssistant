@@ -36,7 +36,7 @@ namespace OllamaCodeAssistant {
 
     #region Event Handlers
 
-    private async void SendButtonClicked(object sender, RoutedEventArgs e) => await HandleSendButtonClickAsync(e);
+    private async void SubmitButtonClicked(object sender, RoutedEventArgs e) => await HandleSubmitButtonClickAsync(e);
 
     private async void ControlLoaded(object sender, RoutedEventArgs e) => await InitializeControlAsync();
 
@@ -129,7 +129,7 @@ namespace OllamaCodeAssistant {
 
     #region Chat Logic
 
-    private async Task HandleSendButtonClickAsync(RoutedEventArgs e) {
+    private async Task HandleSubmitButtonClickAsync(RoutedEventArgs e) {
       ClearError();
 
       if (_cancellationTokenSource != null) {

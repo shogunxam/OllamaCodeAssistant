@@ -9,7 +9,7 @@
              Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
              mc:Ignorable="d"
              d:DesignHeight="300"
-             d:DesignWidth="300"
+             d:DesignWidth="600"
              Loaded="ControlLoaded"
              Name="MyToolWindow">
   <Grid>
@@ -64,7 +64,7 @@
       <TextBox x:Name="UserInputTextBox"
                Margin="5" />
       <Button Content="Send"
-              Click="SendButtonClicked"
+              Click="SubmitButtonClicked"
               Name="SubmitButton"
               Grid.Column="1"
               Margin="5"
