@@ -13,8 +13,10 @@ using System.Windows.Controls;
 using Microsoft.Extensions.AI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Wpf;
 using OllamaCodeAssistant.Options;
+using WebView2 = Microsoft.Web.WebView2.Wpf.WebView2;
 
 namespace OllamaCodeAssistant {
 
@@ -42,6 +44,14 @@ namespace OllamaCodeAssistant {
       Dispatcher.BeginInvoke((Action)(() => {
         ContextIncludeSelection.IsChecked = e != null && e.Length > 0;
       }));
+    }
+
+    private async void RenderMarkdownClicked(object sender, RoutedEventArgs e) {
+      if ((sender as CheckBox).IsChecked == true) {
+        await MarkdownWebView.CoreWebView2.ExecuteScriptAsync($"setRawMode(false);");
+      } else {
+        await MarkdownWebView.CoreWebView2.ExecuteScriptAsync($"setRawMode(true);");
+      }
     }
 
     #endregion Event Handlers

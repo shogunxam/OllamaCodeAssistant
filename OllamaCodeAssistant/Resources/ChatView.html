@@ -98,6 +98,7 @@
   <script>
     let fullText = "";
     let pendingUpdate = false;
+    let rawMode = false;
 
     // Configure marked to generate Prism-compatible code blocks
     marked.setOptions({
@@ -122,26 +123,39 @@
       // Check if user is near the bottom before updating
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
 
-      el.innerHTML = marked.parse(fullText);
+      if (rawMode) {
+        // Escape HTML to safely display raw Markdown
+        el.textContent = fullText;
+        el.style.whiteSpace = "pre-wrap"; // preserves line breaks
+        el.style.fontFamily = "Consolas, monospace"; // for a better raw experience
+      } else {
+        el.innerHTML = marked.parse(fullText);
+
+        // Add line-numbers class to all <pre> elements
+        el.querySelectorAll("pre").forEach(pre => {
+          pre.classList.add("line-numbers");
+        });
+
+        Prism.highlightAll();
+        addCopyButtons();
+      }
 
       // Only scroll if the user was already at (or near) the bottom
       if (nearBottom) {
         el.scrollTop = el.scrollHeight;
       }
-
-      // Add line-numbers class to all <pre> elements
-      el.querySelectorAll("pre").forEach(pre => {
-        pre.classList.add("line-numbers");
-      });
-
-      Prism.highlightAll();
-      addCopyButtons();
     }
 
     // LLM token receiver
     window.chrome?.webview?.addEventListener("message", event => {
       appendToken(event.data);
     });
+
+    // Add bridge so the extension can toggle raw mode
+    window.setRawMode = function (enabled) {
+      rawMode = enabled;
+      renderMarkdown();
+    };
 
     function addCopyButtons() {
       document.querySelectorAll("pre").forEach(pre => {
@@ -161,7 +175,7 @@
                                 border: 1px solid #ccc;
                                 border-radius: 4px;
                                 cursor: pointer;
-                            `;
+                              `;
 
         const wrapper = document.createElement("div");
         wrapper.style.position = "relative";

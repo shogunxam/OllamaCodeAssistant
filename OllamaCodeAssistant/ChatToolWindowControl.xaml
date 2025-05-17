@@ -48,6 +48,11 @@
       <ToggleButton x:Name="ContextIncludeAllOpenFile"
                     Content="All Open Files"
                     Margin="5 0 0 0" />
+      <CheckBox Content="Render Markdown"
+                ToolTip="Toggle whether the converstion with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
+                Click="RenderMarkdownClicked"
+                VerticalAlignment="Center"
+                IsChecked="True" />
     </StackPanel>
 
     <!-- User Input -->
