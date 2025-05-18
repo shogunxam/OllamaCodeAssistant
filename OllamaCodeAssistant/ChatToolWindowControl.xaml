@@ -35,29 +35,45 @@
     </Border>
 
     <!-- Context Controls -->
-    <StackPanel Orientation="Horizontal"
-                Grid.Row="2">
-      <TextBlock Text="Context:"
-                 VerticalAlignment="Center"
-                 Margin="5 0 0 0"/>
-      <ToggleButton x:Name="ContextIncludeSelection"
-                    Content="Selected Text"
-                    Margin="5 0 0 0" />
-      <ToggleButton x:Name="ContextIncludeFile"
-                    Content="Current File"
-                    Margin="5 0 0 0" />
-      <ToggleButton x:Name="ContextIncludeAllOpenFile"
-                    Content="All Open Files"
-                    Margin="5 0 0 0" />
-      <CheckBox Content="Render Markdown"
-                ToolTip="Toggle whether the converstion with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
-                Click="RenderMarkdownClicked"
-                Foreground="#FFFAFAFA"
-                Margin="5 0 0 0"
-                VerticalAlignment="Center"
-                IsChecked="True">
-      </CheckBox>
-    </StackPanel>
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal"
+                  Grid.Column="0">
+        <TextBlock Text="Context:"
+                   VerticalAlignment="Center"
+                   Margin="5 0 0 0" />
+        <ToggleButton x:Name="ContextIncludeSelection"
+                      Content="Selected Text"
+                      Margin="5 0 0 0" />
+        <ToggleButton x:Name="ContextIncludeFile"
+                      Content="Current File"
+                      Margin="5 0 0 0" />
+        <ToggleButton x:Name="ContextIncludeAllOpenFile"
+                      Content="All Open Files"
+                      Margin="5 0 0 0" />
+        <CheckBox Content="Render Markdown"
+                  ToolTip="Toggle whether the converstion with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
+                  Click="RenderMarkdownClicked"
+                  Foreground="#FFFAFAFA"
+                  Margin="5 0 0 0"
+                  VerticalAlignment="Center"
+                  IsChecked="True">
+        </CheckBox>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal"
+                  Grid.Column="2">
+        <TextBlock Text="Model:"
+                   VerticalAlignment="Center"
+                   Margin="5 0 0 0" />
+        <ComboBox x:Name="ModelSelectionComboBox"
+                  SelectionChanged="ModelSelectionChanged"
+                  Margin="5 0 0 0" />
+      </StackPanel>
+    </Grid>
 
     <!-- User Input -->
     <Grid Grid.Row="3">

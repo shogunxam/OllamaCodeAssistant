@@ -12,7 +12,6 @@ namespace OllamaCodeAssistant {
   public class LLMInteractionManager {
     private IChatClient _chatClient;
     private readonly List<ChatMessage> _chatHistory;
-    private readonly OllamaOptionsPage _options;
     private CancellationTokenSource _activeRequestCancellationTokenSource;
     private string _lastChatClientUrl;
     private string _lastChatClientModelName;
@@ -23,21 +22,23 @@ namespace OllamaCodeAssistant {
 
     public bool IsRequestActive { get; private set; }
 
+    public OllamaOptionsPage Options { get; }
+
     public LLMInteractionManager(OllamaOptionsPage options) {
-      _options = options ?? throw new ArgumentNullException(nameof(options));
+      Options = options ?? throw new ArgumentNullException(nameof(options));
       _chatHistory = new List<ChatMessage>();
     }
 
     private void EnsureInitialized() {
       if (IsRequestActive) return;
 
-      if (_chatClient == null || _options.OllamaApiUrl != _lastChatClientUrl || _options.DefaultModel != _lastChatClientModelName) {
+      if (_chatClient == null || Options.OllamaApiUrl != _lastChatClientUrl || Options.DefaultModel != _lastChatClientModelName) {
         // reinitialize the chat client
         _chatClient?.Dispose();
-        _chatClient = new OllamaChatClient(new Uri(_options.OllamaApiUrl), _options.DefaultModel);
+        _chatClient = new OllamaChatClient(new Uri(Options.OllamaApiUrl), Options.DefaultModel);
 
-        _lastChatClientUrl = _options.OllamaApiUrl;
-        _lastChatClientModelName = _options.DefaultModel;
+        _lastChatClientUrl = Options.OllamaApiUrl;
+        _lastChatClientModelName = Options.DefaultModel;
       }
     }
 

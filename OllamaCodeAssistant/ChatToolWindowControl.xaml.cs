@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -24,6 +25,26 @@ namespace OllamaCodeAssistant {
 
     #region Event Handlers
 
+    private async Task InitializeControlAsync() {
+      Loaded -= ControlLoaded; // Unsubscribe from the event to prevent multiple calls
+
+      _llmInteractionManager = new LLMInteractionManager(GetExtensionOptions());
+      _llmInteractionManager.OnResponseReceived += AppendMessageToUI;
+      _llmInteractionManager.OnErrorOccurred += DisplayError;
+
+      await PopulateModelSelectionComboBox(_llmInteractionManager.Options);
+
+      try {
+        await InitializeWebViewAsync(MarkdownWebView);
+      } catch (Exception ex) {
+        DisplayError($"Error loading WebView2: {ex.Message}");
+      }
+
+      TextSelectionListener.SelectionChanged += TextViewTrackerSelectionChanged;
+
+      UserInputTextBox.Focus();
+    }
+
     private async void SubmitButtonClicked(object sender, RoutedEventArgs e) => await HandleSubmitButtonClickAsync();
 
     private async void ControlLoaded(object sender, RoutedEventArgs e) => await InitializeControlAsync();
@@ -40,6 +61,10 @@ namespace OllamaCodeAssistant {
       } else {
         await MarkdownWebView.CoreWebView2.ExecuteScriptAsync($"setRawMode(true);");
       }
+    }
+
+    private void ModelSelectionChanged(object sender, SelectionChangedEventArgs e) {
+      _llmInteractionManager.Options.DefaultModel = ModelSelectionComboBox.SelectedItem.ToString();
     }
 
     #endregion Event Handlers
@@ -69,24 +94,6 @@ namespace OllamaCodeAssistant {
     #endregion UI Helpers
 
     #region WebView2 Initialization
-
-    private async Task InitializeControlAsync() {
-      Loaded -= ControlLoaded; // Unsubscribe from the event to prevent multiple calls
-
-      _llmInteractionManager = new LLMInteractionManager(GetExtensionOptions());
-      _llmInteractionManager.OnResponseReceived += AppendMessageToUI;
-      _llmInteractionManager.OnErrorOccurred += DisplayError;
-
-      try {
-        await InitializeWebViewAsync(MarkdownWebView);
-      } catch (Exception ex) {
-        DisplayError($"Error loading WebView2: {ex.Message}");
-      }
-
-      TextSelectionListener.SelectionChanged += TextViewTrackerSelectionChanged;
-
-      UserInputTextBox.Focus();
-    }
 
     private async Task InitializeWebViewAsync(WebView2 webView) {
       await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -159,6 +166,15 @@ namespace OllamaCodeAssistant {
       var package = _chatToolWindow?.Package as OllamaCodeAssistantPackage;
       var options = package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
       return options;
+    }
+
+    private async Task PopulateModelSelectionComboBox(OllamaOptionsPage options) {
+      try {
+        ModelSelectionComboBox.ItemsSource = await OllamaManager.GetAvailableModelsAsync(options.OllamaApiUrl);
+        ModelSelectionComboBox.SelectedItem = options.DefaultModel;
+      } catch {
+        DisplayError("Failed to load models. Please check your Ollama API URL.");
+      }
     }
   }
 }
