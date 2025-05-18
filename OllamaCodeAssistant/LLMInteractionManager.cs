@@ -13,7 +13,7 @@ namespace OllamaCodeAssistant {
     private IChatClient _chatClient;
     private readonly List<ChatMessage> _chatHistory;
     private readonly OllamaOptionsPage _options;
-    private CancellationTokenSource _cancellationTokenSource;
+    private CancellationTokenSource _activeRequestCancellationTokenSource;
     private string _lastChatClientUrl;
     private string _lastChatClientModelName;
 
@@ -42,9 +42,11 @@ namespace OllamaCodeAssistant {
     }
 
     public async Task HandleUserMessageAsync(string userPrompt, bool includeSelection, bool includeFile, bool includeAllOpenFiles) {
-      EnsureInitialized();
+      if (IsRequestActive) {
+        return;
+      }
 
-      if (IsRequestActive) return;
+      EnsureInitialized();
 
       try {
         IsRequestActive = true;
@@ -57,14 +59,15 @@ namespace OllamaCodeAssistant {
         OnResponseReceived?.Invoke($"\n\nAssistant: ");
 
         var fullResponse = new StringBuilder();
-        _cancellationTokenSource = new CancellationTokenSource();
+        _activeRequestCancellationTokenSource?.Dispose();
+        _activeRequestCancellationTokenSource = new CancellationTokenSource();
 
-        var asyncEnumerable = _chatClient.GetStreamingResponseAsync(_chatHistory, cancellationToken: _cancellationTokenSource.Token);
-        var enumerator = asyncEnumerable.GetAsyncEnumerator(_cancellationTokenSource.Token);
+        var asyncEnumerable = _chatClient.GetStreamingResponseAsync(_chatHistory, cancellationToken: _activeRequestCancellationTokenSource.Token);
+        var enumerator = asyncEnumerable.GetAsyncEnumerator(_activeRequestCancellationTokenSource.Token);
 
         try {
           while (await enumerator.MoveNextAsync()) {
-            if (_cancellationTokenSource.Token.IsCancellationRequested) break;
+            if (_activeRequestCancellationTokenSource.Token.IsCancellationRequested) break;
 
             var response = enumerator.Current ?? throw new ApplicationException("Chat response was null");
             fullResponse.Append(response.Text);
@@ -82,7 +85,7 @@ namespace OllamaCodeAssistant {
           OnResponseReceived?.Invoke("\n```");
         }
 
-        if (_cancellationTokenSource.IsCancellationRequested) {
+        if (_activeRequestCancellationTokenSource.IsCancellationRequested) {
           fullResponse.Append("\n\n...This response was cut short because the user canceled the request.\n\n");
           OnResponseReceived?.Invoke("\n\nQuery Canceled");
         }
@@ -91,35 +94,38 @@ namespace OllamaCodeAssistant {
       } catch (Exception ex) {
         OnErrorOccurred?.Invoke(ex.Message);
       } finally {
-        _cancellationTokenSource = null;
+        _activeRequestCancellationTokenSource?.Dispose();
+        _activeRequestCancellationTokenSource = null;
         IsRequestActive = false;
       }
     }
 
     public async Task<string> GetOneShotResponseAsync(string prompt) {
-      EnsureInitialized();
-
       if (IsRequestActive) {
         return string.Empty;
       }
 
+      EnsureInitialized();
+
       try {
         IsRequestActive = true;
-
-        _cancellationTokenSource = new CancellationTokenSource();
-        var response = await _chatClient.GetResponseAsync(_chatHistory, cancellationToken: _cancellationTokenSource.Token);
+        _activeRequestCancellationTokenSource?.Dispose();
+        _activeRequestCancellationTokenSource = new CancellationTokenSource();
+        _chatHistory.Add(new ChatMessage(ChatRole.User, prompt));
+        var response = await _chatClient.GetResponseAsync(_chatHistory, cancellationToken: _activeRequestCancellationTokenSource.Token);
         return response.Text;
       } catch (Exception ex) {
         OnErrorOccurred?.Invoke(ex.Message);
         return string.Empty;
       } finally {
-        _cancellationTokenSource = null;
         IsRequestActive = false;
+        _activeRequestCancellationTokenSource?.Dispose();
+        _activeRequestCancellationTokenSource = null;
       }
     }
 
     public void CancelCurrentRequest() {
-      _cancellationTokenSource?.Cancel();
+      _activeRequestCancellationTokenSource?.Cancel();
     }
   }
 }
