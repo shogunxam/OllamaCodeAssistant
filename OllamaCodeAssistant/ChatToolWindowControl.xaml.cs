@@ -19,6 +19,8 @@ namespace OllamaCodeAssistant {
     public ChatToolWindowControl(ChatToolWindow chatToolWindow) {
       _chatToolWindow = chatToolWindow;
 
+      OllamaAsyncQuickInfoSource.ChatToolWindowControl = this;
+
       InitializeComponent();
       ClearError();
     }
@@ -70,6 +72,10 @@ namespace OllamaCodeAssistant {
     #endregion Event Handlers
 
     #region UI Helpers
+
+    public void AskLLM(string message) {
+      _llmInteractionManager.HandleUserMessageAsync(message, false, true, false);
+    }
 
     private void DisplayError(string message) {
       Dispatcher.BeginInvoke((Action)(() => {
