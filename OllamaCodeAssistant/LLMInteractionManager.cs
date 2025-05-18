@@ -12,8 +12,8 @@ namespace OllamaCodeAssistant {
   public class LLMInteractionManager {
     private IChatClient _chatClient;
     private readonly List<ChatMessage> _chatHistory;
+    private readonly OllamaOptionsPage _options;
     private CancellationTokenSource _cancellationTokenSource;
-    private bool _isRequestActive;
     private string _lastChatClientUrl;
     private string _lastChatClientModelName;
 
@@ -21,37 +21,40 @@ namespace OllamaCodeAssistant {
 
     public event Action<string> OnErrorOccurred;
 
-    public LLMInteractionManager() {
+    public bool IsRequestActive { get; private set; }
+
+    public LLMInteractionManager(OllamaOptionsPage options) {
+      _options = options ?? throw new ArgumentNullException(nameof(options));
       _chatHistory = new List<ChatMessage>();
     }
 
     private void EnsureInitialized() {
-      if (_isRequestActive) return;
+      if (IsRequestActive) return;
 
-      var options = GetExtensionOptions();
-
-      if (_chatClient == null || options.OllamaApiUrl != _lastChatClientUrl || options.DefaultModel != _lastChatClientModelName) {
+      if (_chatClient == null || _options.OllamaApiUrl != _lastChatClientUrl || _options.DefaultModel != _lastChatClientModelName) {
         // reinitialize the chat client
         _chatClient?.Dispose();
-        _chatClient = new OllamaChatClient(new Uri(options.OllamaApiUrl), options.DefaultModel);
+        _chatClient = new OllamaChatClient(new Uri(_options.OllamaApiUrl), _options.DefaultModel);
 
-        _lastChatClientUrl = options.OllamaApiUrl;
-        _lastChatClientModelName = options.DefaultModel;
+        _lastChatClientUrl = _options.OllamaApiUrl;
+        _lastChatClientModelName = _options.DefaultModel;
       }
     }
 
     public async Task HandleUserMessageAsync(string userPrompt, bool includeSelection, bool includeFile, bool includeAllOpenFiles) {
-      if (_isRequestActive) return;
+      EnsureInitialized();
+
+      if (IsRequestActive) return;
 
       try {
-        _isRequestActive = true;
+        IsRequestActive = true;
+
+        OnResponseReceived?.Invoke($"\n\nYou: {userPrompt}");
+
         userPrompt = PromptManager.BuildPrompt(userPrompt, includeSelection, includeFile, includeAllOpenFiles);
         _chatHistory.Add(new ChatMessage(ChatRole.User, userPrompt));
 
-        OnResponseReceived?.Invoke($"\n\nYou: {userPrompt}");
         OnResponseReceived?.Invoke($"\n\nAssistant: ");
-
-        EnsureInitialized();
 
         var fullResponse = new StringBuilder();
         _cancellationTokenSource = new CancellationTokenSource();
@@ -68,8 +71,7 @@ namespace OllamaCodeAssistant {
             OnResponseReceived?.Invoke(response.Text);
           }
         } catch (OperationCanceledException) {
-          fullResponse.Append("\n\n...This response was cut short because the user canceled the request.\n\n");
-          OnResponseReceived?.Invoke("\n\nQuery Canceled");
+          // Handle gracefully
         } finally {
           await enumerator.DisposeAsync();
         }
@@ -80,22 +82,29 @@ namespace OllamaCodeAssistant {
           OnResponseReceived?.Invoke("\n```");
         }
 
+        if (_cancellationTokenSource.IsCancellationRequested) {
+          fullResponse.Append("\n\n...This response was cut short because the user canceled the request.\n\n");
+          OnResponseReceived?.Invoke("\n\nQuery Canceled");
+        }
+
         _chatHistory.Add(new ChatMessage(ChatRole.Assistant, fullResponse.ToString()));
       } catch (Exception ex) {
         OnErrorOccurred?.Invoke(ex.Message);
       } finally {
         _cancellationTokenSource = null;
-        _isRequestActive = false;
+        IsRequestActive = false;
       }
     }
 
     public async Task<string> GetOneShotResponseAsync(string prompt) {
-      if (_isRequestActive) return string.Empty;
+      EnsureInitialized();
+
+      if (IsRequestActive) {
+        return string.Empty;
+      }
 
       try {
-        _isRequestActive = true;
-
-        EnsureInitialized();
+        IsRequestActive = true;
 
         _cancellationTokenSource = new CancellationTokenSource();
         var response = await _chatClient.GetResponseAsync(_chatHistory, cancellationToken: _cancellationTokenSource.Token);
@@ -105,17 +114,12 @@ namespace OllamaCodeAssistant {
         return string.Empty;
       } finally {
         _cancellationTokenSource = null;
-        _isRequestActive = false;
+        IsRequestActive = false;
       }
     }
 
     public void CancelCurrentRequest() {
       _cancellationTokenSource?.Cancel();
-    }
-
-    private OllamaOptionsPage GetExtensionOptions() {
-      var package = Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(OllamaCodeAssistantPackage)) as OllamaCodeAssistantPackage;
-      return package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
     }
   }
 }
