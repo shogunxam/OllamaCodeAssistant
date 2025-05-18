@@ -52,6 +52,8 @@
       <DependentUpon>ChatToolWindowControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="DETService.cs" />
+    <Compile Include="LLMInteractionManager.cs" />
+    <Compile Include="OllamaManager.cs" />
     <Compile Include="OllamaAsyncQuickInfoSource.cs" />
     <Compile Include="Options\OllamaOptionsControl.xaml.cs">
       <DependentUpon>OllamaOptionsControl.xaml</DependentUpon>
