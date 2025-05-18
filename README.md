@@ -28,6 +28,8 @@ Open the solution file `OllamaCodeAssistant.sln` in Microsoft Visual Studio.
 ### Step 3: Build the Extension
 Build the solution to compile the extension. You can do this by selecting `Build > Build Solution` from the menu or pressing `Ctrl + Shift + B`.
 
+You will need to have the `https://pkgs.dev.azure.com/azure-public/vside/_packaging/vssdk/nuget/v3/index.json` NuGet feed available in your NuGet sources. This is required for the `Microsoft.VisualStudio.SDK` package.
+
 ### Step 4: Deploy the Extension
 1. Select `Debug > Start Debugging` (or press `F5`) to build and launch a new instance of Visual Studio with the extension installed.
 2. Alternatively, you can manually install the `.vsix` file generated in the `bin\Debug` directory:
