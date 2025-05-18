@@ -74,8 +74,7 @@ namespace OllamaCodeAssistant {
     #region UI Helpers
 
     public void AskLLM(string message) {
-      UserInputTextBox.Text = message;
-      HandleSubmitButtonClickAsync();
+      _llmInteractionManager.HandleUserMessageAsync(message, false, true, false);
     }
 
     private void DisplayError(string message) {

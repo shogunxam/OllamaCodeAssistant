@@ -33,7 +33,24 @@ namespace OllamaCodeAssistant {
       var snapshot = triggerPoint.Value.Snapshot;
       int position = triggerPoint.Value.Position;
 
-      var wordSpan = GetWordSpan(snapshot, position);
+      var line = snapshot.GetLineFromPosition(position);
+      var lineText = line.GetText();
+
+      int start = position - line.Start.Position;
+      int wordStart = start;
+      int wordEnd = start;
+
+      while (wordStart > 0 && char.IsLetterOrDigit(lineText[wordStart - 1]))
+        wordStart--;
+
+      while (wordEnd < lineText.Length && char.IsLetterOrDigit(lineText[wordEnd]))
+        wordEnd++;
+
+      if (wordStart == wordEnd)
+        return null;
+
+      var wordSpan = snapshot.CreateTrackingSpan(line.Start + wordStart, wordEnd - wordStart, SpanTrackingMode.EdgeInclusive);
+
       if (wordSpan == null)
         return null;
 
@@ -51,6 +68,8 @@ namespace OllamaCodeAssistant {
         return new QuickInfoItem(wordSpan, content);
       }
 
+      var prompt = $"Please explain the usage of \"{word}\" within the following line of code: ```{lineText}```";
+
       // Show clickable link using navigationAction
       var runs = new List<ClassifiedTextRun> {
       new ClassifiedTextRun(PredefinedClassificationTypeNames.Comment, "💡 "),
@@ -58,7 +77,7 @@ namespace OllamaCodeAssistant {
           PredefinedClassificationTypeNames.Keyword,
           "Get LLM Suggestion",
           navigationAction: () => {
-            _ = FetchSuggestionAndRefreshAsync(session, wordSpan, CancellationToken.None);
+            _ = FetchSuggestionAndRefreshAsync(session, prompt);
           }
         )
       };
@@ -91,20 +110,16 @@ namespace OllamaCodeAssistant {
       return snapshot.CreateTrackingSpan(line.Start + wordStart, wordEnd - wordStart, SpanTrackingMode.EdgeInclusive);
     }
 
-    private async Task FetchSuggestionAndRefreshAsync(IAsyncQuickInfoSession session, ITrackingSpan wordSpan, CancellationToken cancellationToken) {
+    private async Task FetchSuggestionAndRefreshAsync(IAsyncQuickInfoSession session, string prompt) {
       if (_disposed)
         return;
 
-      // Get the word text
-      string word = wordSpan.GetText(session.TextView.TextSnapshot);
-
       // Fire this off to the LLM asynchronously
-      ChatToolWindowControl.AskLLM($"In one sentence, please explain the usage of \"{word}\" ");
+      ChatToolWindowControl.AskLLM(prompt);
 
-      // Refresh the QuickInfo tooltip with the new content
+      // Close the quick info
       await session.DismissAsync();
     }
-
 
     public void Dispose() {
       _disposed = true;
