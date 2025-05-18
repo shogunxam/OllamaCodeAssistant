@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -13,8 +12,6 @@ using System.Windows.Controls;
 using Microsoft.Extensions.AI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.WinForms;
-using Microsoft.Web.WebView2.Wpf;
 using OllamaCodeAssistant.Options;
 using WebView2 = Microsoft.Web.WebView2.Wpf.WebView2;
 
@@ -30,6 +27,9 @@ namespace OllamaCodeAssistant {
 
     public ChatToolWindowControl(ChatToolWindow chatToolWindow) {
       _chatToolWindow = chatToolWindow;
+
+      OllamaAsyncQuickInfoSource.ChatToolWindowControl = this;
+
       InitializeComponent();
       ClearError();
     }
@@ -57,6 +57,11 @@ namespace OllamaCodeAssistant {
     #endregion Event Handlers
 
     #region UI Helpers
+
+    public void AskLLM(string message) {
+      UserInputTextBox.Text = message;
+      HandleSubmitButtonClickAsync(null);
+    }
 
     private void DisplayError(string message) {
       Dispatcher.BeginInvoke((Action)(() => {
