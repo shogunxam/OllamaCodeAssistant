@@ -75,7 +75,7 @@ namespace OllamaCodeAssistant {
       new ClassifiedTextRun(PredefinedClassificationTypeNames.Comment, "💡 "),
         new ClassifiedTextRun(
           PredefinedClassificationTypeNames.Keyword,
-          "Get LLM Suggestion",
+          "Ask Ollama for explanation",
           navigationAction: () => {
             _ = FetchSuggestionAndRefreshAsync(session, prompt);
           }

@@ -7,7 +7,6 @@ namespace OllamaCodeAssistant {
 
   [Export(typeof(IAsyncQuickInfoSourceProvider))]
   [Name("OllamaAsyncQuickInfoSourceProvider")]
-  [ContentType("CSharp")]
   [ContentType("code")]
   internal class OllamaAsyncQuickInfoSourceProvider : IAsyncQuickInfoSourceProvider {
 
