@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -33,6 +32,7 @@ namespace OllamaCodeAssistant {
       _llmInteractionManager = new LLMInteractionManager(GetExtensionOptions());
       _llmInteractionManager.OnResponseReceived += AppendMessageToUI;
       _llmInteractionManager.OnErrorOccurred += DisplayError;
+      _llmInteractionManager.OnLogEntryReceived += AppendMessageToLog; ;
 
       await PopulateModelSelectionComboBox(_llmInteractionManager.Options);
 
@@ -46,6 +46,8 @@ namespace OllamaCodeAssistant {
 
       UserInputTextBox.Focus();
     }
+
+
 
     private async void SubmitButtonClicked(object sender, RoutedEventArgs e) => await HandleSubmitButtonClickAsync();
 
@@ -94,6 +96,12 @@ namespace OllamaCodeAssistant {
     private void AppendMessageToUI(string message) {
       Dispatcher.BeginInvoke((Action)(() => {
         MarkdownWebView.CoreWebView2.PostWebMessageAsString(message);
+      }));
+    }
+
+    private void AppendMessageToLog(string message) {
+      Dispatcher.BeginInvoke((Action)(() => {
+        LogListBox.Items.Add($"{DateTime.Now}:\n{message}");
       }));
     }
 

@@ -21,6 +21,8 @@ namespace OllamaCodeAssistant {
 
     public event Action<string> OnErrorOccurred;
 
+    public event Action<string> OnLogEntryReceived;
+
     public bool IsRequestActive { get; private set; }
 
     public OllamaOptionsPage Options { get; }
@@ -82,13 +84,15 @@ namespace OllamaCodeAssistant {
                 fullResponse.Append(textContent.Text);
                 OnResponseReceived?.Invoke(textContent.Text);
               } else if (content is UsageContent usage) {
-                Debug.WriteLine($"Input tokens: {usage?.Details.InputTokenCount}");
-                Debug.WriteLine($"Output tokens: {usage?.Details.OutputTokenCount}");
-                Debug.WriteLine($"Total tokens: {usage?.Details.TotalTokenCount}");
-                Debug.WriteLine($"Load duration: {usage?.Details.AdditionalCounts["load_duration"]}");
-                Debug.WriteLine($"Total duration: {usage?.Details.AdditionalCounts["total_duration"]}");
-                Debug.WriteLine($"Prompt eval duration: {usage?.Details.AdditionalCounts["prompt_eval_duration"]}");
-                Debug.WriteLine($"Eval duration: {usage?.Details.AdditionalCounts["eval_duration"]}");
+                var logEntry = new StringBuilder();
+                logEntry.AppendLine($"Input tokens: {usage?.Details.InputTokenCount}");
+                logEntry.AppendLine($"Output tokens: {usage?.Details.OutputTokenCount}");
+                logEntry.AppendLine($"Total tokens: {usage?.Details.TotalTokenCount}");
+                logEntry.AppendLine($"Load duration: {usage?.Details.AdditionalCounts["load_duration"]}");
+                logEntry.AppendLine($"Total duration: {usage?.Details.AdditionalCounts["total_duration"]}");
+                logEntry.AppendLine($"Prompt eval duration: {usage?.Details.AdditionalCounts["prompt_eval_duration"]}");
+                logEntry.AppendLine($"Eval duration: {usage?.Details.AdditionalCounts["eval_duration"]}");
+                OnLogEntryReceived?.Invoke(logEntry.ToString());
               } else {
                 Debug.WriteLine($"Unknown content type: {content.GetType()}");
               }

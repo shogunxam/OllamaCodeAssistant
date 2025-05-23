@@ -12,83 +12,112 @@
              d:DesignWidth="600"
              Loaded="ControlLoaded"
              Name="MyToolWindow">
-  <Grid>
-    <Grid.RowDefinitions>
-      <RowDefinition Height="*" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-    </Grid.RowDefinitions>
+  <TabControl TabStripPlacement="Right"
+              Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+              Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}">
+    <TabItem Header="Chat">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-    <!-- Chat Display -->
-    <wv2:WebView2 x:Name="MarkdownWebView"
-                  Grid.Row="0" />
+        <!-- Chat Display -->
+        <wv2:WebView2 x:Name="MarkdownWebView"
+                      Grid.Row="0" />
 
-    <!-- Error Display -->
-    <Border Grid.Row="1"
-            Background="Red"
-            Visibility="Collapsed"
-            x:Name="ErrorDisplayBorder">
-      <TextBlock x:Name="ErrorDisplayTextBlock"
-                 Foreground="White"
-                 Margin="5" />
-    </Border>
+        <!-- Error Display -->
+        <Border Grid.Row="1"
+                Background="Red"
+                Visibility="Collapsed"
+                x:Name="ErrorDisplayBorder">
+          <TextBlock x:Name="ErrorDisplayTextBlock"
+                     Foreground="White"
+                     Margin="5" />
+        </Border>
 
-    <!-- Context Controls -->
-    <Grid Grid.Row="2">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
-      </Grid.ColumnDefinitions>
-      <StackPanel Orientation="Horizontal"
-                  Grid.Column="0">
-        <TextBlock Text="Context:"
-                   VerticalAlignment="Center"
-                   Margin="5 0 0 0" />
-        <ToggleButton x:Name="ContextIncludeSelection"
-                      Content="Selected Text"
+        <!-- Context Controls -->
+        <Grid Grid.Row="2">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Orientation="Horizontal"
+                      Grid.Column="0">
+            <TextBlock Text="Context:"
+                       Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                       Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+                       VerticalAlignment="Center"
+                       Margin="5 0 0 0" />
+            <ToggleButton x:Name="ContextIncludeSelection"
+                          Content="Selected Text"
+                          Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                          Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+                          Margin="5 0 0 0" />
+            <ToggleButton x:Name="ContextIncludeFile"
+                          Content="Current File"
+                          Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                          Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+                          Margin="5 0 0 0" />
+            <ToggleButton x:Name="ContextIncludeAllOpenFile"
+                          Content="All Open Files"
+                          Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                          Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+                          Margin="5 0 0 0" />
+            <CheckBox ToolTip="Toggle whether the converstion with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
+                      Click="RenderMarkdownClicked"
+                      Foreground="#FFFAFAFA"
+                      Margin="5 0 0 0"
+                      VerticalAlignment="Center"
+                      IsChecked="True">
+              <CheckBox.Content>
+                <TextBlock Text="Render Markdown"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                           Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}" />
+              </CheckBox.Content>
+            </CheckBox>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal"
+                      Grid.Column="2">
+            <TextBlock Text="Model:"
+                       Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                       Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+                       VerticalAlignment="Center"
+                       Margin="5 0 0 0" />
+            <ComboBox x:Name="ModelSelectionComboBox"
+                      SelectionChanged="ModelSelectionChanged"
                       Margin="5 0 0 0" />
-        <ToggleButton x:Name="ContextIncludeFile"
-                      Content="Current File"
-                      Margin="5 0 0 0" />
-        <ToggleButton x:Name="ContextIncludeAllOpenFile"
-                      Content="All Open Files"
-                      Margin="5 0 0 0" />
-        <CheckBox Content="Render Markdown"
-                  ToolTip="Toggle whether the converstion with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
-                  Click="RenderMarkdownClicked"
-                  Foreground="#FFFAFAFA"
-                  Margin="5 0 0 0"
-                  VerticalAlignment="Center"
-                  IsChecked="True">
-        </CheckBox>
-      </StackPanel>
-      <StackPanel Orientation="Horizontal"
-                  Grid.Column="2">
-        <TextBlock Text="Model:"
-                   VerticalAlignment="Center"
-                   Margin="5 0 0 0" />
-        <ComboBox x:Name="ModelSelectionComboBox"
-                  SelectionChanged="ModelSelectionChanged"
-                  Margin="5 0 0 0" />
-      </StackPanel>
-    </Grid>
+          </StackPanel>
+        </Grid>
 
-    <!-- User Input -->
-    <Grid Grid.Row="3">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
-      </Grid.ColumnDefinitions>
-      <TextBox x:Name="UserInputTextBox"
+        <!-- User Input -->
+        <Grid Grid.Row="3">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBox x:Name="UserInputTextBox"
+                   Margin="5" />
+          <Button Content="Send"
+                  Click="SubmitButtonClicked"
+                  Name="SubmitButton"
+                  Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                  Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
+                  Grid.Column="1"
+                  Margin="5"
+                  IsDefault="True" />
+        </Grid>
+      </Grid>
+    </TabItem>
+    <TabItem Header="Log">
+      <ListBox x:Name="LogListBox"
+               Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+               Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                Margin="5" />
-      <Button Content="Send"
-              Click="SubmitButtonClicked"
-              Name="SubmitButton"
-              Grid.Column="1"
-              Margin="5"
-              IsDefault="True" />
-    </Grid>
-  </Grid>
+    </TabItem>
+  </TabControl>
 </UserControl>
