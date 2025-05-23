@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -63,7 +64,11 @@ namespace OllamaCodeAssistant {
         _activeRequestCancellationTokenSource?.Dispose();
         _activeRequestCancellationTokenSource = new CancellationTokenSource();
 
-        var asyncEnumerable = _chatClient.GetStreamingResponseAsync(_chatHistory, cancellationToken: _activeRequestCancellationTokenSource.Token);
+        var options = new ChatOptions() { AdditionalProperties = new AdditionalPropertiesDictionary() };
+        //options.AdditionalProperties.Add("num_ctx", 32768);
+        //num_ctx = int(self.token_count(messages) * 1.25) + 8192
+        //kwargs["num_ctx"] = num_ctx
+        var asyncEnumerable = _chatClient.GetStreamingResponseAsync(_chatHistory, options, cancellationToken: _activeRequestCancellationTokenSource.Token);
         var enumerator = asyncEnumerable.GetAsyncEnumerator(_activeRequestCancellationTokenSource.Token);
 
         try {
@@ -71,8 +76,26 @@ namespace OllamaCodeAssistant {
             if (_activeRequestCancellationTokenSource.Token.IsCancellationRequested) break;
 
             var response = enumerator.Current ?? throw new ApplicationException("Chat response was null");
-            fullResponse.Append(response.Text);
-            OnResponseReceived?.Invoke(response.Text);
+
+            foreach (var content in response.Contents) {
+              if (content is TextContent textContent) {
+                fullResponse.Append(textContent.Text);
+                OnResponseReceived?.Invoke(textContent.Text);
+              } else if (content is UsageContent usage) {
+                Debug.WriteLine($"Input tokens: {usage?.Details.InputTokenCount}");
+                Debug.WriteLine($"Output tokens: {usage?.Details.OutputTokenCount}");
+                Debug.WriteLine($"Total tokens: {usage?.Details.TotalTokenCount}");
+                Debug.WriteLine($"Load duration: {usage?.Details.AdditionalCounts["load_duration"]}");
+                Debug.WriteLine($"Total duration: {usage?.Details.AdditionalCounts["total_duration"]}");
+                Debug.WriteLine($"Prompt eval duration: {usage?.Details.AdditionalCounts["prompt_eval_duration"]}");
+                Debug.WriteLine($"Eval duration: {usage?.Details.AdditionalCounts["eval_duration"]}");
+              } else {
+                Debug.WriteLine($"Unknown content type: {content.GetType()}");
+              }
+            }
+
+            //fullResponse.Append(response.Text);
+            //OnResponseReceived?.Invoke(response.Text);
           }
         } catch (OperationCanceledException) {
           // Handle gracefully
