@@ -2,6 +2,7 @@
 using OllamaCodeAssistant.Options;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -49,8 +50,13 @@ namespace OllamaCodeAssistant {
         _lastChatClientModelName = Options.DefaultModel;
       }
     }
+    private string FormatUserMessage(string message)
+    {
+        string escapedMessage = WebUtility.HtmlEncode(message);
+        return $"<div class=\"user-prompt\"><b>You:</b> {escapedMessage}</div>";
+    }
 
-    public async Task HandleUserMessageAsync(string userPrompt, bool includeSelection, bool includeFile, bool includeAllOpenFiles) {
+  public async Task HandleUserMessageAsync(string userPrompt, bool includeSelection, bool includeFile, bool includeAllOpenFiles) {
       if (IsRequestActive) {
         return;
       }
@@ -60,12 +66,12 @@ namespace OllamaCodeAssistant {
       try {
         IsRequestActive = true;
 
-        OnResponseReceived?.Invoke($"\n\nYou: {userPrompt}");
+        OnResponseReceived?.Invoke(FormatUserMessage(userPrompt));
 
         userPrompt = PromptManager.BuildPrompt(userPrompt, includeSelection, includeFile, includeAllOpenFiles);
         _chatHistory.Add(new ChatMessage(ChatRole.User, userPrompt));
 
-        OnResponseReceived?.Invoke($"\n\nAssistant: ");
+        OnResponseReceived?.Invoke("<p><b>Assistant: </b>");
 
         var fullResponse = new StringBuilder();
         _activeRequestCancellationTokenSource?.Dispose();
