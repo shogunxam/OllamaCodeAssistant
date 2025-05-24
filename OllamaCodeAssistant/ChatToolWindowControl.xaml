@@ -26,6 +26,7 @@
 
         <!-- Chat Display -->
         <wv2:WebView2 x:Name="MarkdownWebView"
+                      NavigationStarting="MarkdownWebViewNavigationStarting"
                       Grid.Row="0" />
 
         <!-- Error Display -->

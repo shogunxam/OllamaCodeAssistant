@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -46,8 +47,6 @@ namespace OllamaCodeAssistant {
 
       UserInputTextBox.Focus();
     }
-
-
 
     private async void SubmitButtonClicked(object sender, RoutedEventArgs e) => await HandleSubmitButtonClickAsync();
 
@@ -107,7 +106,20 @@ namespace OllamaCodeAssistant {
 
     #endregion UI Helpers
 
-    #region WebView2 Initialization
+    #region WebView2
+
+    private void MarkdownWebViewNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e) {
+      var uri = e.Uri;
+
+      // If it's not our original page, block and open externally
+      if (!string.IsNullOrEmpty(uri) && !uri.StartsWith("data:") && !uri.StartsWith("about:") && !uri.StartsWith("file://")) {
+        e.Cancel = true;
+        Process.Start(new ProcessStartInfo {
+          FileName = uri,
+          UseShellExecute = true
+        });
+      }
+    }
 
     private async Task InitializeWebViewAsync(WebView2 webView) {
       await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -139,7 +151,7 @@ namespace OllamaCodeAssistant {
       }
     }
 
-    #endregion WebView2 Initialization
+    #endregion WebView2
 
     #region Chat Logic
 
