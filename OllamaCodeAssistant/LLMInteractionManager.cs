@@ -1,18 +1,19 @@
-﻿using System;
+﻿using Microsoft.Extensions.AI;
+using OllamaCodeAssistant.Options;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.AI;
-using OllamaCodeAssistant.Options;
 
 namespace OllamaCodeAssistant {
 
   public class LLMInteractionManager {
+
     private IChatClient _chatClient;
     private readonly List<ChatMessage> _chatHistory;
+    private long _cumulativeTokenCount;
     private CancellationTokenSource _activeRequestCancellationTokenSource;
     private string _lastChatClientUrl;
     private string _lastChatClientModelName;
@@ -26,6 +27,10 @@ namespace OllamaCodeAssistant {
     public bool IsRequestActive { get; private set; }
 
     public OllamaOptionsPage Options { get; }
+
+    public int MinimumContextWindowTokens = 2049;
+    public int MaximumContextWindowTokens = 32768;
+
 
     public LLMInteractionManager(OllamaOptionsPage options) {
       Options = options ?? throw new ArgumentNullException(nameof(options));
@@ -67,9 +72,11 @@ namespace OllamaCodeAssistant {
         _activeRequestCancellationTokenSource = new CancellationTokenSource();
 
         var options = new ChatOptions() { AdditionalProperties = new AdditionalPropertiesDictionary() };
-        //options.AdditionalProperties.Add("num_ctx", 32768);
+
+        // Adjust context window size the same way Aider does
         //num_ctx = int(self.token_count(messages) * 1.25) + 8192
-        //kwargs["num_ctx"] = num_ctx
+        var contextWindowSize = Math.Max(MinimumContextWindowTokens, Math.Min(MaximumContextWindowTokens, (int)(_cumulativeTokenCount * 1.25) + 8192));
+        options.AdditionalProperties.Add("num_ctx", contextWindowSize);
         var asyncEnumerable = _chatClient.GetStreamingResponseAsync(_chatHistory, options, cancellationToken: _activeRequestCancellationTokenSource.Token);
         var enumerator = asyncEnumerable.GetAsyncEnumerator(_activeRequestCancellationTokenSource.Token);
 
@@ -84,22 +91,28 @@ namespace OllamaCodeAssistant {
                 fullResponse.Append(textContent.Text);
                 OnResponseReceived?.Invoke(textContent.Text);
               } else if (content is UsageContent usage) {
+
+                if (usage.Details.TotalTokenCount.HasValue) {
+                  _cumulativeTokenCount += usage.Details.TotalTokenCount.Value;
+                }
+
                 var logEntry = new StringBuilder();
-                logEntry.AppendLine($"Input tokens: {usage?.Details.InputTokenCount}");
-                logEntry.AppendLine($"Output tokens: {usage?.Details.OutputTokenCount}");
-                logEntry.AppendLine($"Total tokens: {usage?.Details.TotalTokenCount}");
-                logEntry.AppendLine($"Load duration: {usage?.Details.AdditionalCounts["load_duration"]}");
-                logEntry.AppendLine($"Total duration: {usage?.Details.AdditionalCounts["total_duration"]}");
-                logEntry.AppendLine($"Prompt eval duration: {usage?.Details.AdditionalCounts["prompt_eval_duration"]}");
-                logEntry.AppendLine($"Eval duration: {usage?.Details.AdditionalCounts["eval_duration"]}");
+                logEntry.AppendLine($"Model: {Options.DefaultModel}");
+                logEntry.AppendLine($"Context Window Size: {contextWindowSize:N0}");
+                logEntry.AppendLine($"Input tokens: {usage.Details.InputTokenCount}");
+                logEntry.AppendLine($"Output tokens: {usage.Details.OutputTokenCount}");
+                logEntry.AppendLine($"Total tokens: {usage.Details.TotalTokenCount}");
+                logEntry.AppendLine($"Load duration: {usage.Details.AdditionalCounts["load_duration"]}");
+                logEntry.AppendLine($"Total duration: {usage.Details.AdditionalCounts["total_duration"]}");
+                logEntry.AppendLine($"Prompt eval duration: {usage.Details.AdditionalCounts["prompt_eval_duration"]}");
+                logEntry.AppendLine($"Eval duration: {usage.Details.AdditionalCounts["eval_duration"]}");
                 OnLogEntryReceived?.Invoke(logEntry.ToString());
+
               } else {
-                Debug.WriteLine($"Unknown content type: {content.GetType()}");
+                OnLogEntryReceived?.Invoke($"Unknown content type: {content.GetType()}");
               }
             }
 
-            //fullResponse.Append(response.Text);
-            //OnResponseReceived?.Invoke(response.Text);
           }
         } catch (OperationCanceledException) {
           // Handle gracefully
