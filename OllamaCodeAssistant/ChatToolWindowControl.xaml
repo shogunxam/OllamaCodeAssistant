@@ -32,10 +32,10 @@
         <Border Grid.Row="1"
                 Background="Red"
                 Visibility="Collapsed"
-                x:Name="ErrorDisplayBorder">
+                x:Name="ErrorDisplayBorder"
+                Padding="5">
           <TextBlock x:Name="ErrorDisplayTextBlock"
-                     Foreground="White"
-                     Margin="5" />
+                     Foreground="White" />
         </Border>
 
         <!-- Context Controls -->
@@ -49,43 +49,31 @@
                       Grid.Column="0">
             <TextBlock Text="Context:"
                        Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                       Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                        VerticalAlignment="Center"
                        Margin="5 0 0 0" />
             <ToggleButton x:Name="ContextIncludeSelection"
                           Content="Selected Text"
-                          Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                          Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                           Margin="5 0 0 0" />
             <ToggleButton x:Name="ContextIncludeFile"
                           Content="Current File"
-                          Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                          Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                           Margin="5 0 0 0" />
             <ToggleButton x:Name="ContextIncludeAllOpenFile"
                           Content="All Open Files"
-                          Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                          Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                           Margin="5 0 0 0" />
-            <CheckBox ToolTip="Toggle whether the converstion with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
+            <CheckBox ToolTip="Toggle whether the conversation with the LLM should be rendered as Markdown or not. Turn this off when asking the LLM to provide you with Markdown."
                       Click="RenderMarkdownClicked"
-                      Foreground="#FFFAFAFA"
-                      Margin="5 0 0 0"
                       VerticalAlignment="Center"
+                      Margin="5 0 0 0"
                       IsChecked="True">
-              <CheckBox.Content>
-                <TextBlock Text="Render Markdown"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                           Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}" />
-              </CheckBox.Content>
+              <TextBlock Text="Render Markdown"
+                         Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                         VerticalAlignment="Center" />
             </CheckBox>
           </StackPanel>
           <StackPanel Orientation="Horizontal"
                       Grid.Column="2">
             <TextBlock Text="Model:"
                        Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                       Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                        VerticalAlignment="Center"
                        Margin="5 0 0 0" />
             <ComboBox x:Name="ModelSelectionComboBox"
@@ -105,8 +93,6 @@
           <Button Content="Send"
                   Click="SubmitButtonClicked"
                   Name="SubmitButton"
-                  Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                  Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                   Grid.Column="1"
                   Margin="5"
                   IsDefault="True" />
@@ -115,8 +101,6 @@
     </TabItem>
     <TabItem Header="Log">
       <ListBox x:Name="LogListBox"
-               Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-               Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                Margin="5" />
     </TabItem>
   </TabControl>
