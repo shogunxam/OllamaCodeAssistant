@@ -136,28 +136,27 @@ namespace OllamaCodeAssistant
             try
             {
                 var caretPosition = _textView.Caret.Position.BufferPosition;
-                var currentText = _textView.TextSnapshot.GetText(0, caretPosition.Position);
+                var codeBefore = _textView.TextSnapshot.GetText(0, caretPosition.Position);
+                var codeAfter = _textView.TextSnapshot.GetText(caretPosition.Position, _textView.TextSnapshot.Length - caretPosition.Position);
 
                 // Non suggerire se il testo è troppo corto o finisce con spazio/newline
-                if (currentText.Length < 10 ||
-                    currentText.EndsWith(" ") ||
-                    currentText.EndsWith("\n") ||
-                    currentText.EndsWith("\r\n"))
+                if (codeBefore.Length < 10 ||
+                    codeBefore.EndsWith(" ") ||
+                    codeBefore.EndsWith("\n") ||
+                    codeBefore.EndsWith("\r\n"))
                 {
                     return;
                 }
-
+                System.Diagnostics.Debug.WriteLine($"Richiesta suggerimento per testo: {codeBefore}");
                 System.Diagnostics.Debug.WriteLine($"Richiesta suggerimento per posizione: {caretPosition.Position}");
 
                 _isProcessing = true;
 
-                string prompt = $"Complete this code with just the next logical line or completion. Return ONLY the new code without any explanations, comments, or code block markers. Do not repeat the existing code.\n\nExisting code:\n{currentText}\n\nNew code:";
-
-                string response = await _llmManager.GetOneShotResponseAsync(prompt);
+                string response = await _llmManager.GetCodeCompletionAsync(codeBefore, codeAfter);
 
                 if (!string.IsNullOrWhiteSpace(response))
                 {
-                    string cleanSuggestion = ExtractNewCodeFromResponse(response, currentText);
+                    string cleanSuggestion = ExtractNewCodeFromResponse(response, codeBefore);
                     if (!string.IsNullOrWhiteSpace(cleanSuggestion))
                     {
                         // Verifica che il cursore sia ancora nella stessa posizione
