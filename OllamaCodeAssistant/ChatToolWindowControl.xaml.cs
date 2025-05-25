@@ -30,10 +30,12 @@ namespace OllamaCodeAssistant {
     private async Task InitializeControlAsync() {
       Loaded -= ControlLoaded; // Unsubscribe from the event to prevent multiple calls
 
-      _llmInteractionManager = new LLMInteractionManager(GetExtensionOptions());
+      var package = _chatToolWindow?.Package as OllamaCodeAssistantPackage;
+      _llmInteractionManager = package?.GetLLMInteractionManager() ?? throw new ApplicationException("Unable to load LLM Interaction Manager");
+
       _llmInteractionManager.OnResponseReceived += AppendMessageToUI;
       _llmInteractionManager.OnErrorOccurred += DisplayError;
-      _llmInteractionManager.OnLogEntryReceived += AppendMessageToLog; ;
+      _llmInteractionManager.OnLogEntryReceived += AppendMessageToLog;
 
       await PopulateModelSelectionComboBox(_llmInteractionManager.Options);
 

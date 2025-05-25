@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.VisualStudio.Shell;
+using OllamaCodeAssistant.Options;
 using Task = System.Threading.Tasks.Task;
 
 namespace OllamaCodeAssistant {
@@ -29,13 +30,9 @@ namespace OllamaCodeAssistant {
   [ProvideToolWindow(typeof(ChatToolWindow))]
   [ProvideOptionPage(typeof(OllamaCodeAssistant.Options.OllamaOptionsPage), "Ollama Code Assistant", "General", 0, 0, true)]
   public sealed class OllamaCodeAssistantPackage : AsyncPackage {
-
-    /// <summary>
-    /// OllamaCodeAssistantPackage GUID string.
-    /// </summary>
     public const string PackageGuidString = "cd664fe7-17e3-40fc-8101-c366e2ba5da9";
 
-    #region Package Members
+    private LLMInteractionManager _llmInteractionManager;
 
     /// <summary>
     /// Initialization of the package; this method is called right after the package is sited, so this is the place
@@ -48,10 +45,14 @@ namespace OllamaCodeAssistant {
       // When initialized asynchronously, the current thread may be a background thread at this point.
       // Do any initialization that requires the UI thread after switching to the UI thread.
       await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-      await ChatToolWindowCommand.InitializeAsync(this);
-      await ExecuteExplainErrorCommand.InitializeAsync(this);
+
+      var options = GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
+      _llmInteractionManager = new LLMInteractionManager(options);
+
+      await ChatToolWindowCommand.InitializeAsync(this, _llmInteractionManager);
+      await ExecuteExplainErrorCommand.InitializeAsync(this, _llmInteractionManager);
     }
 
-    #endregion Package Members
+    public LLMInteractionManager GetLLMInteractionManager() => _llmInteractionManager;
   }
 }

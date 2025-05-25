@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel.Design;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.Shell;
-using Task = System.Threading.Tasks.Task;
 
 namespace OllamaCodeAssistant {
 
@@ -52,18 +52,14 @@ namespace OllamaCodeAssistant {
     /// Gets the service provider from the owner package.
     /// </summary>
     private Microsoft.VisualStudio.Shell.IAsyncServiceProvider ServiceProvider {
-      get {
-        return this.package;
-      }
+      get { return this.package; }
     }
 
     /// <summary>
     /// Initializes the singleton instance of the command.
     /// </summary>
     /// <param name="package">Owner package, not null.</param>
-    public static async Task InitializeAsync(AsyncPackage package) {
-      // Switch to the main thread - the call to AddCommand in ChatToolWindowCommand's constructor requires
-      // the UI thread.
+    public static async Task InitializeAsync(AsyncPackage package, LLMInteractionManager llmInteractionManager) {
       await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
       OleMenuCommandService commandService = await package.GetServiceAsync((typeof(IMenuCommandService))) as OleMenuCommandService;
@@ -81,10 +77,6 @@ namespace OllamaCodeAssistant {
         if ((null == window) || (null == window.Frame)) {
           throw new NotSupportedException("Cannot create tool window");
         }
-
-        //if (window is ChatToolWindow chatToolWindow && this.package is OllamaCodeAssistantPackage ollamaPackage) {
-        //  chatToolWindow.Package = ollamaPackage;
-        //}
       });
     }
   }
