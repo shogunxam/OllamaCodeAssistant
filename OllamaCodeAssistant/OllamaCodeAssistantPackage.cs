@@ -1,7 +1,8 @@
-﻿using System;
+﻿using Microsoft.VisualStudio.ComponentModelHost;
+using Microsoft.VisualStudio.Shell;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Microsoft.VisualStudio.Shell;
 using Task = System.Threading.Tasks.Task;
 
 namespace OllamaCodeAssistant {
@@ -27,6 +28,7 @@ namespace OllamaCodeAssistant {
   [ProvideMenuResource("Menus.ctmenu", 1)]
   [ProvideToolWindow(typeof(ChatToolWindow))]
   [ProvideOptionPage(typeof(OllamaCodeAssistant.Options.OllamaOptionsPage), "Ollama Code Assistant", "General", 0, 0, true)]
+  [ProvideService(typeof(OllamaCodeAssistantPackage))]
   public sealed class OllamaCodeAssistantPackage : AsyncPackage {
     /// <summary>
     /// OllamaCodeAssistantPackage GUID string.
@@ -34,6 +36,8 @@ namespace OllamaCodeAssistant {
     public const string PackageGuidString = "cd664fe7-17e3-40fc-8101-c366e2ba5da9";
 
     #region Package Members
+
+    public static OllamaCodeAssistantPackage Instance { get; private set; }
 
     /// <summary>
     /// Initialization of the package; this method is called right after the package is sited, so this is the place
@@ -46,7 +50,9 @@ namespace OllamaCodeAssistant {
       // When initialized asynchronously, the current thread may be a background thread at this point.
       // Do any initialization that requires the UI thread after switching to the UI thread.
       await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-    await ChatToolWindowCommand.InitializeAsync(this);
+            Instance = this;
+            await ChatToolWindowCommand.InitializeAsync(this);
+
     }
 
     #endregion

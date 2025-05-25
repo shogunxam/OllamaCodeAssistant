@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.AI;
+using Microsoft.VisualStudio.ComponentModelHost;
 using OllamaCodeAssistant.Options;
 using System;
 using System.Collections.Generic;
@@ -48,7 +49,7 @@ namespace OllamaCodeAssistant {
 
         _lastChatClientUrl = Options.OllamaApiUrl;
         _lastChatClientModelName = Options.DefaultModel;
-      }
+        }
     }
     private string FormatUserMessage(string message)
     {
@@ -171,7 +172,48 @@ namespace OllamaCodeAssistant {
       }
     }
 
-    public void CancelCurrentRequest() {
+        public async Task<string> GetCodeCompletionAsync(string codeContext)
+        {
+            if (IsRequestActive)
+            {
+                return string.Empty;
+            }
+
+            EnsureInitialized();
+
+            try
+            {
+                IsRequestActive = true;
+                _activeRequestCancellationTokenSource?.Dispose();
+                _activeRequestCancellationTokenSource = new CancellationTokenSource();
+
+                // Prompt ottimizzato per il completamento del codice
+                string prompt = $@"Complete the following code with just the next logical line or statement. 
+Return ONLY the new code without any explanations, comments, or code block markers.
+Do not repeat the existing code.
+
+Existing code:
+{codeContext}
+
+New code:";
+
+                var messages = new List<ChatMessage> { new ChatMessage(ChatRole.User, prompt) };
+                var response = await _chatClient.GetResponseAsync(messages, cancellationToken: _activeRequestCancellationTokenSource.Token);
+                return response.Text?.Trim() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                OnErrorOccurred?.Invoke(ex.Message);
+                return string.Empty;
+            }
+            finally
+            {
+                IsRequestActive = false;
+                _activeRequestCancellationTokenSource?.Dispose();
+                _activeRequestCancellationTokenSource = null;
+            }
+        }
+        public void CancelCurrentRequest() {
       _activeRequestCancellationTokenSource?.Cancel();
     }
   }
