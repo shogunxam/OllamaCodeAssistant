@@ -19,6 +19,22 @@ namespace OllamaCodeAssistant
         private string _currentSuggestion;
         private int _suggestionStartPosition;
         private bool _isVisible;
+        private readonly object _lockObject = new object();
+
+        // Proprietà pubblica per permettere al KeyProcessor di controllare lo stato
+        public bool IsVisible
+        {
+            get
+            {
+                lock (_lockObject)
+                {
+                    return _isVisible &&
+                           !string.IsNullOrEmpty(_currentSuggestion) &&
+                           _suggestionTextBlock != null;
+                }
+            }
+        }
+
 
         public InlineSuggestionAdornment(IWpfTextView textView)
         {
@@ -30,45 +46,104 @@ namespace OllamaCodeAssistant
             _textView.TextBuffer.Changed += OnTextBufferChanged;
             _textView.Caret.PositionChanged += OnCaretPositionChanged;
 
-            // Accedi al controllo WPF per gli eventi di focus e tastiera
-            if (_textView.VisualElement != null)
-            {
-                _textView.VisualElement.LostKeyboardFocus += OnLostFocus;
-                _textView.VisualElement.PreviewKeyDown += OnKeyDown;
-            }
+            System.Diagnostics.Debug.WriteLine("InlineSuggestionAdornment creato");
         }
-
         public void ShowSuggestion(string suggestion, int position)
         {
-            if (string.IsNullOrWhiteSpace(suggestion))
+            lock (_lockObject)
             {
-                HideSuggestion();
-                return;
+                if (string.IsNullOrWhiteSpace(suggestion))
+                {
+                    HideSuggestion();
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"ShowSuggestion chiamato con: '{suggestion}' alla posizione {position}");
+
+                // Nascondi eventuali suggerimenti di IntelliCode quando mostriamo il nostro
+                DismissIntelliCodeSuggestions();
+
+                _currentSuggestion = suggestion;
+                _suggestionStartPosition = position;
+                _isVisible = true;
+
+                CreateSuggestionTextBlock();
+                PositionSuggestion();
             }
-            System.Diagnostics.Debug.WriteLine($"ShowSuggestion chiamato con: '{suggestion}' alla posizione {position}");
-
-            _currentSuggestion = suggestion;
-            _suggestionStartPosition = position;
-            _isVisible = true;
-
-            CreateSuggestionTextBlock();
-            PositionSuggestion();
         }
 
         public void HideSuggestion()
         {
-            if (_suggestionTextBlock != null)
+            lock (_lockObject)
             {
-                _adornmentLayer.RemoveAdornment(_suggestionTextBlock);
-                _suggestionTextBlock = null;
+                if (_suggestionTextBlock != null)
+                {
+                    _adornmentLayer.RemoveAdornment(_suggestionTextBlock);
+                    _suggestionTextBlock = null;
+                }
+                _currentSuggestion = null;
+                _isVisible = false;
+                System.Diagnostics.Debug.WriteLine("Suggerimento nascosto");
             }
-            _currentSuggestion = null;
-            _isVisible = false;
+        }
+
+        private void DismissIntelliCodeSuggestions()
+        {
+            try
+            {
+                // Prova a chiudere le sessioni di completamento attive
+                var componentModel = Microsoft.VisualStudio.Shell.ServiceProvider.GlobalProvider.GetService(typeof(Microsoft.VisualStudio.ComponentModelHost.SComponentModel)) as Microsoft.VisualStudio.ComponentModelHost.IComponentModel;
+
+                if (componentModel != null)
+                {
+                    var completionBroker = componentModel.GetService<Microsoft.VisualStudio.Language.Intellisense.ICompletionBroker>();
+                    if (completionBroker != null)
+                    {
+                        var sessions = completionBroker.GetSessions(_textView);
+                        foreach (var session in sessions.Where(s => !s.IsDismissed))
+                        {
+                            session.Dismiss();
+                            System.Diagnostics.Debug.WriteLine("Sessione IntelliCode chiusa");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Errore nel chiudere IntelliCode: {ex.Message}");
+            }
+        }
+        public bool IsCaretAtSuggestionPosition(int caretPosition)
+        {
+            lock (_lockObject)
+            {
+                return _isVisible &&
+                       !string.IsNullOrEmpty(_currentSuggestion) &&
+                       caretPosition == _suggestionStartPosition;
+            }
         }
 
         public bool AcceptSuggestion()
         {
-            if (!_isVisible || string.IsNullOrEmpty(_currentSuggestion))
+            string suggestionToAccept;
+            int startPosition;
+            bool isCurrentlyVisible;
+
+            // Copia le variabili dentro il lock
+            lock (_lockObject)
+            {
+                suggestionToAccept = _currentSuggestion;
+                startPosition = _suggestionStartPosition;
+                isCurrentlyVisible = _isVisible;
+            }
+
+            if (!isCurrentlyVisible || string.IsNullOrEmpty(suggestionToAccept))
+            {
+                System.Diagnostics.Debug.WriteLine("AcceptSuggestion: suggerimento non visibile o vuoto");
+                return false;
+            }
+
+            if (!isCurrentlyVisible || string.IsNullOrEmpty(suggestionToAccept))
             {
                 System.Diagnostics.Debug.WriteLine("AcceptSuggestion: suggerimento non visibile o vuoto");
                 return false;
@@ -76,46 +151,61 @@ namespace OllamaCodeAssistant
 
             try
             {
-                System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: inserisco '{_currentSuggestion}' alla posizione {_suggestionStartPosition}");
+                System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: inserisco '{suggestionToAccept}' alla posizione {startPosition}");
 
                 // Verifica che la posizione sia ancora valida
-                if (_suggestionStartPosition > _textView.TextSnapshot.Length)
+                if (startPosition > _textView.TextSnapshot.Length)
                 {
-                    System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: posizione {_suggestionStartPosition} non valida per snapshot di lunghezza {_textView.TextSnapshot.Length}");
+                    System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: posizione {startPosition} non valida per snapshot di lunghezza {_textView.TextSnapshot.Length}");
                     HideSuggestion();
                     return false;
                 }
+
+                // Verifica che il cursore sia ancora nella posizione corretta
+                var currentCaretPosition = _textView.Caret.Position.BufferPosition.Position;
+                if (currentCaretPosition != startPosition)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Cursore spostato da {startPosition} a {currentCaretPosition}");
+                    HideSuggestion();
+                    return false;
+                }
+
+                // Nascondi il suggerimento PRIMA di modificare il testo per evitare interferenze
+                HideSuggestion();
 
                 // Disabilita temporaneamente gli eventi per evitare interferenze
                 _textView.TextBuffer.Changed -= OnTextBufferChanged;
 
-                var edit = _textView.TextBuffer.CreateEdit();
-                edit.Insert(_suggestionStartPosition, _currentSuggestion);
-                var snapshot = edit.Apply();
-
-                // Riabilita gli eventi
-                _textView.TextBuffer.Changed += OnTextBufferChanged;
-
-                if (snapshot != null)
+                try
                 {
-                    // Muovi il cursore alla fine del testo inserito
-                    var newPosition = _suggestionStartPosition + _currentSuggestion.Length;
-                    if (newPosition <= snapshot.Length)
+                    var edit = _textView.TextBuffer.CreateEdit();
+                    edit.Insert(startPosition, suggestionToAccept);
+                    var snapshot = edit.Apply();
+
+                    if (snapshot != null)
                     {
-                        var newPoint = new SnapshotPoint(snapshot, newPosition);
-                        _textView.Caret.MoveTo(newPoint);
-                        System.Diagnostics.Debug.WriteLine($"Cursore spostato alla posizione {newPosition}");
-                    }
+                        // Muovi il cursore alla fine del testo inserito
+                        var newPosition = startPosition + suggestionToAccept.Length;
+                        if (newPosition <= snapshot.Length)
+                        {
+                            var newPoint = new SnapshotPoint(snapshot, newPosition);
+                            _textView.Caret.MoveTo(newPoint);
+                            System.Diagnostics.Debug.WriteLine($"Cursore spostato alla posizione {newPosition}");
+                        }
 
-                    HideSuggestion();
-                    System.Diagnostics.Debug.WriteLine("Suggerimento accettato con successo");
-                    return true;
+                        System.Diagnostics.Debug.WriteLine("Suggerimento accettato con successo");
+                        return true;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("AcceptSuggestion: edit.Apply() ha restituito null");
+                        return false;
+                    }
                 }
-                else
+                finally
                 {
-                    System.Diagnostics.Debug.WriteLine("AcceptSuggestion: edit.Apply() ha restituito null");
-                    HideSuggestion();
-                    return false;
+                    // Riabilita gli eventi
+                    _textView.TextBuffer.Changed += OnTextBufferChanged;
                 }
             }
             catch (Exception ex)
@@ -125,7 +215,6 @@ namespace OllamaCodeAssistant
 
                 // Riabilita gli eventi in caso di errore
                 _textView.TextBuffer.Changed += OnTextBufferChanged;
-                HideSuggestion();
                 return false;
             }
         }
@@ -142,12 +231,14 @@ namespace OllamaCodeAssistant
             _suggestionTextBlock = new TextBlock
             {
                 Text = _currentSuggestion,
-                Foreground = new SolidColorBrush(Colors.Gray),
-                Opacity = 0.6,
+                Foreground = new SolidColorBrush(Colors.LightGreen),
+                Opacity = 0.8,
                 FontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily,
                 FontSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize,
                 FontStyle = FontStyles.Italic,
-                IsHitTestVisible = false // Non intercetta i click del mouse
+                FontWeight = FontWeights.Bold,
+                IsHitTestVisible = false,
+                Background = new SolidColorBrush(Color.FromArgb(30, 0, 255, 0))
             };
         }
 
@@ -175,7 +266,6 @@ namespace OllamaCodeAssistant
                 }
 
                 var line = _textView.GetTextViewLineContainingBufferPosition(snapshotPoint);
-
                 if (line == null)
                 {
                     HideSuggestion();
@@ -238,103 +328,6 @@ namespace OllamaCodeAssistant
             }
         }
 
-        private void OnLostFocus(object sender, KeyboardFocusChangedEventArgs e)
-        {
-            HideSuggestion();
-        }
-
-        private void OnKeyDown(object sender, KeyEventArgs e)
-        {
-            if (!_isVisible || string.IsNullOrEmpty(_currentSuggestion))
-                return;
-
-            System.Diagnostics.Debug.WriteLine($"Tasto premuto: {e.Key}, suggerimento attivo: '{_currentSuggestion}'");
-
-            // Verifica che il cursore sia ancora nella posizione corretta
-            var currentCaretPosition = _textView.Caret.Position.BufferPosition.Position;
-            if (currentCaretPosition != _suggestionStartPosition)
-            {
-                System.Diagnostics.Debug.WriteLine($"Cursore spostato da {_suggestionStartPosition} a {currentCaretPosition}, nascondo suggerimento");
-                HideSuggestion();
-                return;
-            }
-
-            switch (e.Key)
-            {
-                case Key.Tab:
-                    System.Diagnostics.Debug.WriteLine("Tab premuto, accetto suggerimento");
-                    if (AcceptSuggestion())
-                    {
-                        e.Handled = true;
-                        System.Diagnostics.Debug.WriteLine("Suggerimento accettato con Tab");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine("Errore nell'accettazione del suggerimento con Tab");
-                    }
-                    break;
-
-                case Key.Right:
-                    // Accetta solo se siamo alla fine della riga o se non c'è altro testo dopo il cursore
-                    var line = _textView.TextSnapshot.GetLineFromPosition(_suggestionStartPosition);
-                    var positionInLine = _suggestionStartPosition - line.Start.Position;
-                    var lineText = line.GetText();
-
-                    if (positionInLine >= lineText.Length || string.IsNullOrWhiteSpace(lineText.Substring(positionInLine)))
-                    {
-                        System.Diagnostics.Debug.WriteLine("Freccia destra premuta alla fine della riga, accetto suggerimento");
-                        if (AcceptSuggestion())
-                        {
-                            e.Handled = true;
-                            System.Diagnostics.Debug.WriteLine("Suggerimento accettato con freccia destra");
-                        }
-                    }
-                    break;
-
-                case Key.Escape:
-                    System.Diagnostics.Debug.WriteLine("Escape premuto, nascondo suggerimento");
-                    HideSuggestion();
-                    e.Handled = true;
-                    break;
-
-                case Key.End:
-                    System.Diagnostics.Debug.WriteLine("End premuto, accetto suggerimento");
-                    if (AcceptSuggestion())
-                    {
-                        e.Handled = true;
-                        System.Diagnostics.Debug.WriteLine("Suggerimento accettato con End");
-                    }
-                    break;
-
-                default:
-                    if (IsTextModifyingKey(e.Key))
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Tasto modificatore di testo premuto: {e.Key}, nascondo suggerimento");
-                        HideSuggestion();
-                    }
-                    break;
-            }
-        }
-
-        private static readonly HashSet<Key> NonModifyingKeys = new HashSet<Key>
-    {
-        Key.LeftCtrl, Key.RightCtrl,
-        Key.LeftAlt, Key.RightAlt,
-        Key.LeftShift, Key.RightShift,
-        Key.Left, Key.Right, Key.Up, Key.Down,
-        Key.Home, Key.End,
-        Key.PageUp, Key.PageDown,
-        Key.Insert, Key.CapsLock, Key.NumLock,
-        Key.PrintScreen, Key.Pause,
-        Key.F1, Key.F2, Key.F3, Key.F4, Key.F5, Key.F6,
-        Key.F7, Key.F8, Key.F9, Key.F10, Key.F11, Key.F12,
-        Key.LWin, Key.RWin, Key.Apps
-    };
-        private bool IsTextModifyingKey(Key key)
-        {
-            return !NonModifyingKeys.Contains(key);
-        }
-
         public void Dispose()
         {
             HideSuggestion();
@@ -342,12 +335,6 @@ namespace OllamaCodeAssistant
             _textView.LayoutChanged -= OnLayoutChanged;
             _textView.TextBuffer.Changed -= OnTextBufferChanged;
             _textView.Caret.PositionChanged -= OnCaretPositionChanged;
-
-            if (_textView.VisualElement != null)
-            {
-                _textView.VisualElement.LostKeyboardFocus -= OnLostFocus;
-                _textView.VisualElement.PreviewKeyDown -= OnKeyDown;
-            }
         }
     }
 }

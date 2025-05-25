@@ -55,6 +55,7 @@
     <Compile Include="InlineSuggestionAdornment.cs" />
     <Compile Include="InlineSuggestionAdornmentFactory.cs" />
     <Compile Include="LLMInteractionManager.cs" />
+    <Compile Include="OllamaCommandFilterProvider.cs" />
     <Compile Include="OllamaManager.cs" />
     <Compile Include="OllamaAsyncQuickInfoSource.cs" />
     <Compile Include="Options\OllamaOptionsControl.xaml.cs">
@@ -101,6 +102,9 @@
     <PackageReference Include="Microsoft.Extensions.AI.Ollama">
       <Version>9.5.0-preview.1.25262.9</Version>
     </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.Language.Intellisense">
+      <Version>17.14.249</Version>
+    </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40270" ExcludeAssets="runtime" NoWarn="NU1604">
       <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -124,6 +128,7 @@
     <VSCTCompile Include="OllamaCodeAssistantPackage.vsct">
       <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
+    <Compile Include="OllamaCommandFilter.cs" />
     <Content Include="Resources\ChatToolWindowCommand.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -57,11 +57,56 @@ namespace OllamaCodeAssistant
             _llmManager = llmManager;
             _suggestionAdornment = new InlineSuggestionAdornment(_textView);
 
+            // Configura il Command Filter invece del KeyProcessor
+            SetupCommandFilter();
+
             System.Diagnostics.Debug.WriteLine("AutoCompleteHandler creato");
 
             _textView.TextBuffer.Changed += OnTextChanged;
             _textView.Closed += OnTextViewClosed;
         }
+
+        // Modifica il metodo SetupKeyProcessor nella classe AutoCompleteHandler
+        private void SetupCommandFilter()
+        {
+            try
+            {
+                // Ottieni il command filter dalle proprietà della TextView
+                if (_textView.Properties.TryGetProperty(typeof(OllamaCommandFilter), out OllamaCommandFilter commandFilter))
+                {
+                    commandFilter.SetSuggestionAdornment(_suggestionAdornment);
+                    System.Diagnostics.Debug.WriteLine("CommandFilter configurato con successo");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("CommandFilter non trovato nelle proprietà");
+
+                    // Prova a configurarlo dopo un breve delay
+                    System.Threading.Tasks.Task.Delay(100).ContinueWith(_ =>
+                    {
+                        Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.Run(async () =>
+                        {
+                            await Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                            if (_textView.Properties.TryGetProperty(typeof(OllamaCommandFilter), out OllamaCommandFilter delayedFilter))
+                            {
+                                delayedFilter.SetSuggestionAdornment(_suggestionAdornment);
+                                System.Diagnostics.Debug.WriteLine("CommandFilter configurato con successo (delayed)");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine("CommandFilter ancora non trovato dopo delay");
+                            }
+                        });
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Errore nella configurazione del CommandFilter: {ex.Message}");
+            }
+        }
+
 
         private void OnTextViewClosed(object sender, System.EventArgs e)
         {
