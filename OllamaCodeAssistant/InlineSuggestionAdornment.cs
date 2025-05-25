@@ -1,4 +1,7 @@
-﻿using Microsoft.VisualStudio.Text;
+﻿using Microsoft.VisualStudio.PlatformUI;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Text;
+using Microsoft.VisualStudio.Text.Classification;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Formatting;
 using System;
@@ -21,7 +24,6 @@ namespace OllamaCodeAssistant
         private bool _isVisible;
         private readonly object _lockObject = new object();
 
-        // Proprietà pubblica per permettere al KeyProcessor di controllare lo stato
         public bool IsVisible
         {
             get
@@ -35,19 +37,17 @@ namespace OllamaCodeAssistant
             }
         }
 
-
         public InlineSuggestionAdornment(IWpfTextView textView)
         {
             _textView = textView;
             _adornmentLayer = textView.GetAdornmentLayer("InlineSuggestion");
-
-            // Sottoscrivi agli eventi
+            // Subscribe to events
             _textView.LayoutChanged += OnLayoutChanged;
             _textView.TextBuffer.Changed += OnTextBufferChanged;
             _textView.Caret.PositionChanged += OnCaretPositionChanged;
-
-            System.Diagnostics.Debug.WriteLine("InlineSuggestionAdornment creato");
+            System.Diagnostics.Debug.WriteLine("InlineSuggestionAdornment created");
         }
+
         public void ShowSuggestion(string suggestion, int position)
         {
             lock (_lockObject)
@@ -57,16 +57,12 @@ namespace OllamaCodeAssistant
                     HideSuggestion();
                     return;
                 }
-
-                System.Diagnostics.Debug.WriteLine($"ShowSuggestion chiamato con: '{suggestion}' alla posizione {position}");
-
-                // Nascondi eventuali suggerimenti di IntelliCode quando mostriamo il nostro
+                System.Diagnostics.Debug.WriteLine($"ShowSuggestion called with: '{suggestion}' at position {position}");
+                // Hide any IntelliCode suggestions when showing our own
                 DismissIntelliCodeSuggestions();
-
                 _currentSuggestion = suggestion;
                 _suggestionStartPosition = position;
                 _isVisible = true;
-
                 CreateSuggestionTextBlock();
                 PositionSuggestion();
             }
@@ -83,7 +79,7 @@ namespace OllamaCodeAssistant
                 }
                 _currentSuggestion = null;
                 _isVisible = false;
-                System.Diagnostics.Debug.WriteLine("Suggerimento nascosto");
+                System.Diagnostics.Debug.WriteLine("Suggestion hidden");
             }
         }
 
@@ -91,9 +87,8 @@ namespace OllamaCodeAssistant
         {
             try
             {
-                // Prova a chiudere le sessioni di completamento attive
+                // Try to close any active completion sessions
                 var componentModel = Microsoft.VisualStudio.Shell.ServiceProvider.GlobalProvider.GetService(typeof(Microsoft.VisualStudio.ComponentModelHost.SComponentModel)) as Microsoft.VisualStudio.ComponentModelHost.IComponentModel;
-
                 if (componentModel != null)
                 {
                     var completionBroker = componentModel.GetService<Microsoft.VisualStudio.Language.Intellisense.ICompletionBroker>();
@@ -103,16 +98,17 @@ namespace OllamaCodeAssistant
                         foreach (var session in sessions.Where(s => !s.IsDismissed))
                         {
                             session.Dismiss();
-                            System.Diagnostics.Debug.WriteLine("Sessione IntelliCode chiusa");
+                            System.Diagnostics.Debug.WriteLine("IntelliCode session closed");
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Errore nel chiudere IntelliCode: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error closing IntelliCode: {ex.Message}");
             }
         }
+
         public bool IsCaretAtSuggestionPosition(int caretPosition)
         {
             lock (_lockObject)
@@ -128,97 +124,83 @@ namespace OllamaCodeAssistant
             string suggestionToAccept;
             int startPosition;
             bool isCurrentlyVisible;
-
-            // Copia le variabili dentro il lock
+            // Copy variables inside the lock
             lock (_lockObject)
             {
                 suggestionToAccept = _currentSuggestion;
                 startPosition = _suggestionStartPosition;
                 isCurrentlyVisible = _isVisible;
             }
-
             if (!isCurrentlyVisible || string.IsNullOrEmpty(suggestionToAccept))
             {
-                System.Diagnostics.Debug.WriteLine("AcceptSuggestion: suggerimento non visibile o vuoto");
-                return false;
-            }
-
-            if (!isCurrentlyVisible || string.IsNullOrEmpty(suggestionToAccept))
-            {
-                System.Diagnostics.Debug.WriteLine("AcceptSuggestion: suggerimento non visibile o vuoto");
+                System.Diagnostics.Debug.WriteLine("AcceptSuggestion: suggestion not visible or empty");
                 return false;
             }
 
             try
             {
-                System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: inserisco '{suggestionToAccept}' alla posizione {startPosition}");
-
-                // Verifica che la posizione sia ancora valida
+                System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: inserting '{suggestionToAccept}' at position {startPosition}");
+                // Check that the position is still valid
                 if (startPosition > _textView.TextSnapshot.Length)
                 {
-                    System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: posizione {startPosition} non valida per snapshot di lunghezza {_textView.TextSnapshot.Length}");
+                    System.Diagnostics.Debug.WriteLine($"AcceptSuggestion: position {startPosition} is invalid for snapshot length {_textView.TextSnapshot.Length}");
                     HideSuggestion();
                     return false;
                 }
 
-                // Verifica che il cursore sia ancora nella posizione corretta
+                // Verify that the cursor is still at the correct position
                 var currentCaretPosition = _textView.Caret.Position.BufferPosition.Position;
                 if (currentCaretPosition != startPosition)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Cursore spostato da {startPosition} a {currentCaretPosition}");
+                    System.Diagnostics.Debug.WriteLine($"Cursor moved from {startPosition} to {currentCaretPosition}");
                     HideSuggestion();
                     return false;
                 }
 
-                // Nascondi il suggerimento PRIMA di modificare il testo per evitare interferenze
+                // Hide the suggestion BEFORE modifying text to avoid interference
                 HideSuggestion();
 
-                // Disabilita temporaneamente gli eventi per evitare interferenze
+                // Temporarily disable events to prevent interference
                 _textView.TextBuffer.Changed -= OnTextBufferChanged;
-
                 try
                 {
                     var edit = _textView.TextBuffer.CreateEdit();
                     edit.Insert(startPosition, suggestionToAccept);
                     var snapshot = edit.Apply();
-
                     if (snapshot != null)
                     {
-                        // Muovi il cursore alla fine del testo inserito
+                        // Move cursor to the end of the inserted text
                         var newPosition = startPosition + suggestionToAccept.Length;
                         if (newPosition <= snapshot.Length)
                         {
                             var newPoint = new SnapshotPoint(snapshot, newPosition);
                             _textView.Caret.MoveTo(newPoint);
-                            System.Diagnostics.Debug.WriteLine($"Cursore spostato alla posizione {newPosition}");
+                            System.Diagnostics.Debug.WriteLine($"Cursor moved to position {newPosition}");
                         }
-
-                        System.Diagnostics.Debug.WriteLine("Suggerimento accettato con successo");
+                        System.Diagnostics.Debug.WriteLine("Suggestion accepted successfully");
                         return true;
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine("AcceptSuggestion: edit.Apply() ha restituito null");
+                        System.Diagnostics.Debug.WriteLine("AcceptSuggestion: edit.Apply() returned null");
                         return false;
                     }
                 }
                 finally
                 {
-                    // Riabilita gli eventi
+                    // Re-enable events
                     _textView.TextBuffer.Changed += OnTextBufferChanged;
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Errore nell'accettazione del suggerimento: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error accepting suggestion: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-
-                // Riabilita gli eventi in caso di errore
+                // Re-enable events in case of error
                 _textView.TextBuffer.Changed += OnTextBufferChanged;
                 return false;
             }
         }
-
 
         private void CreateSuggestionTextBlock()
         {
@@ -228,18 +210,89 @@ namespace OllamaCodeAssistant
                 _suggestionTextBlock = null;
             }
 
+            // Simplified version using only VS theme colors
+            var suggestionBrush = GetAdaptiveSuggestionBrush();
             _suggestionTextBlock = new TextBlock
             {
                 Text = _currentSuggestion,
-                Foreground = new SolidColorBrush(Colors.LightGreen),
-                Opacity = 0.8,
+                Foreground = suggestionBrush,
+                Opacity = 0.6,
                 FontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily,
                 FontSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize,
                 FontStyle = FontStyles.Italic,
-                FontWeight = FontWeights.Bold,
+                FontWeight = FontWeights.Normal,
                 IsHitTestVisible = false,
-                Background = new SolidColorBrush(Color.FromArgb(30, 0, 255, 0))
+                Background = Brushes.Transparent
             };
+        }
+
+        private Brush GetAdaptiveSuggestionBrush()
+        {
+            try
+            {
+                // Method 1: Try to use VS theme colors (with proper conversion)
+                try
+                {
+                    var drawingColor = VSColorTheme.GetThemedColor(EnvironmentColors.SystemGrayTextColorKey);
+                    var mediaColor = ConvertDrawingColorToMediaColor(drawingColor);
+                    return new SolidColorBrush(mediaColor);
+                }
+                catch
+                {
+                    // Proceed to next method
+                }
+
+                // Method 2: Determine based on editor background color
+                var editorBackground = _textView.Background;
+                if (editorBackground is SolidColorBrush backgroundBrush)
+                {
+                    var bgColor = backgroundBrush.Color;
+                    // Calculate luminance
+                    double luminance = (0.299 * bgColor.R + 0.587 * bgColor.G + 0.114 * bgColor.B) / 255;
+                    if (luminance > 0.5)
+                    {
+                        // Light theme: use dark gray
+                        return new SolidColorBrush(Color.FromRgb(100, 100, 100));
+                    }
+                    else
+                    {
+                        // Dark theme: use light gray
+                        return new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                    }
+                }
+
+                // Method 3: Use the editor's text color with reduced opacity
+                var textProperties = _textView.FormattedLineSource.DefaultTextProperties;
+                if (textProperties.ForegroundBrush is SolidColorBrush textBrush)
+                {
+                    var textColor = textBrush.Color;
+                    // Create a more transparent version of the text color
+                    return new SolidColorBrush(Color.FromArgb(
+                        150, // Reduced alpha for transparency
+                        textColor.R,
+                        textColor.G,
+                        textColor.B
+                    ));
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error determining adaptive color: {ex.Message}");
+            }
+
+            // Final fallback
+            return new SolidColorBrush(Color.FromRgb(150, 150, 150));
+        }
+
+        // Helper method to convert System.Drawing.Color to System.Windows.Media.Color
+        private Color ConvertDrawingColorToMediaColor(System.Drawing.Color drawingColor)
+        {
+            return Color.FromArgb(
+                drawingColor.A,
+                drawingColor.R,
+                drawingColor.G,
+                drawingColor.B
+            );
         }
 
         private void PositionSuggestion()
@@ -258,7 +311,7 @@ namespace OllamaCodeAssistant
 
                 var snapshotPoint = new SnapshotPoint(snapshot, _suggestionStartPosition);
 
-                // Verifica che la linea sia visibile
+                // Verify that the line is visible
                 if (!_textView.TextViewLines.ContainsBufferPosition(snapshotPoint))
                 {
                     HideSuggestion();
@@ -273,7 +326,6 @@ namespace OllamaCodeAssistant
                 }
 
                 var characterBounds = line.GetCharacterBounds(snapshotPoint);
-
                 Canvas.SetLeft(_suggestionTextBlock, characterBounds.Left);
                 Canvas.SetTop(_suggestionTextBlock, characterBounds.Top);
 
@@ -287,7 +339,7 @@ namespace OllamaCodeAssistant
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Errore nel posizionamento del suggerimento: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error positioning suggestion: {ex.Message}");
                 HideSuggestion();
             }
         }
@@ -302,12 +354,11 @@ namespace OllamaCodeAssistant
 
         private void OnTextBufferChanged(object sender, TextContentChangedEventArgs e)
         {
-            // Se l'utente continua a scrivere, nascondi il suggerimento
+            // If user keeps typing, hide the suggestion
             if (_isVisible)
             {
                 var caretPosition = _textView.Caret.Position.BufferPosition.Position;
-
-                // Se il cursore si è mosso oltre la posizione del suggerimento, nascondilo
+                // If the cursor has moved beyond the suggestion position, hide it
                 if (caretPosition != _suggestionStartPosition)
                 {
                     HideSuggestion();
@@ -317,7 +368,7 @@ namespace OllamaCodeAssistant
 
         private void OnCaretPositionChanged(object sender, CaretPositionChangedEventArgs e)
         {
-            // Nascondi il suggerimento se il cursore si muove
+            // Hide the suggestion if the cursor moves
             if (_isVisible)
             {
                 var caretPosition = e.NewPosition.BufferPosition.Position;
@@ -331,7 +382,6 @@ namespace OllamaCodeAssistant
         public void Dispose()
         {
             HideSuggestion();
-
             _textView.LayoutChanged -= OnLayoutChanged;
             _textView.TextBuffer.Changed -= OnTextBufferChanged;
             _textView.Caret.PositionChanged -= OnCaretPositionChanged;

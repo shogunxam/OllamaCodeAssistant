@@ -1,13 +1,15 @@
+using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
-using Microsoft.VisualStudio.Shell;
 using OllamaCodeAssistant.Options;
-using System.ComponentModel.Composition;
-using System.Threading.Tasks;
-using System.Text.RegularExpressions;
-using System.Linq;
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.Composition;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace OllamaCodeAssistant
 {
@@ -18,12 +20,10 @@ namespace OllamaCodeAssistant
     {
         public void TextViewCreated(IWpfTextView textView)
         {
-            System.Diagnostics.Debug.WriteLine($"TextViewCreated chiamato per: {textView.TextBuffer.ContentType.TypeName}");
-
+            System.Diagnostics.Debug.WriteLine($"TextViewCreated called for: {textView.TextBuffer.ContentType.TypeName}");
             ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
             {
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
                 var package = OllamaCodeAssistantPackage.Instance;
                 if (package != null)
                 {
@@ -36,240 +36,349 @@ namespace OllamaCodeAssistant
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("Package instance non disponibile");
+                    System.Diagnostics.Debug.WriteLine("Package instance not available");
                 }
             });
         }
-    }
 
-    internal class AutoCompleteHandler
-    {
-        private readonly IWpfTextView _textView;
-        private readonly LLMInteractionManager _llmManager;
-        private readonly InlineSuggestionAdornment _suggestionAdornment;
-        private bool _isProcessing = false;
-        private System.Threading.Timer _debounceTimer;
-        private const int DEBOUNCE_DELAY_MS = 1000; // 1 secondo di delay
-
-        public AutoCompleteHandler(IWpfTextView textView, LLMInteractionManager llmManager)
+        internal class AutoCompleteHandler
         {
-            _textView = textView;
-            _llmManager = llmManager;
-            _suggestionAdornment = new InlineSuggestionAdornment(_textView);
+            private readonly IWpfTextView _textView;
+            private readonly LLMInteractionManager _llmManager;
+            private readonly InlineSuggestionAdornment _suggestionAdornment;
+            private bool _isProcessing = false;
+            private System.Threading.Timer _debounceTimer;
+            private const int DEBOUNCE_DELAY_MS = 1000; // 1 second delay
 
-            // Configura il Command Filter invece del KeyProcessor
-            SetupCommandFilter();
-
-            System.Diagnostics.Debug.WriteLine("AutoCompleteHandler creato");
-
-            _textView.TextBuffer.Changed += OnTextChanged;
-            _textView.Closed += OnTextViewClosed;
-        }
-
-        // Modifica il metodo SetupKeyProcessor nella classe AutoCompleteHandler
-        private void SetupCommandFilter()
-        {
-            try
+            public AutoCompleteHandler(IWpfTextView textView, LLMInteractionManager llmManager)
             {
-                // Ottieni il command filter dalle proprietà della TextView
-                if (_textView.Properties.TryGetProperty(typeof(OllamaCommandFilter), out OllamaCommandFilter commandFilter))
-                {
-                    commandFilter.SetSuggestionAdornment(_suggestionAdornment);
-                    System.Diagnostics.Debug.WriteLine("CommandFilter configurato con successo");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("CommandFilter non trovato nelle proprietà");
+                _textView = textView;
+                _llmManager = llmManager;
+                _suggestionAdornment = new InlineSuggestionAdornment(_textView);
+                // Configure the Command Filter instead of KeyProcessor
+                SetupCommandFilter();
+                System.Diagnostics.Debug.WriteLine("AutoCompleteHandler created");
+                _textView.TextBuffer.Changed += OnTextChanged;
+                _textView.Closed += OnTextViewClosed;
+            }
 
-                    // Prova a configurarlo dopo un breve delay
-                    System.Threading.Tasks.Task.Delay(100).ContinueWith(_ =>
+            // New method to determine the programming language
+            private string GetProgrammingLanguage()
+            {
+                try
+                {
+                    // 1. Try to get the language from ContentType
+                    var contentType = _textView.TextBuffer.ContentType.TypeName;
+                    System.Diagnostics.Debug.WriteLine($"ContentType: {contentType}");
+
+                    // Map content types to languages
+                    var languageMap = new Dictionary<string, string>
                     {
-                        Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.Run(async () =>
-                        {
-                            await Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                        { "CSharp", "C#" },
+                        { "csharp", "C#" },
+                        { "C/C++", "C++" },
+                        { "cpp", "C++" },
+                        { "JavaScript", "JavaScript" },
+                        { "TypeScript", "TypeScript" },
+                        { "Python", "Python" },
+                        { "Java", "Java" },
+                        { "HTML", "HTML" },
+                        { "CSS", "CSS" },
+                        { "XML", "XML" },
+                        { "JSON", "JSON" },
+                        { "SQL", "SQL" },
+                        { "PowerShell", "PowerShell" },
+                        { "VB", "Visual Basic" },
+                        { "F#", "F#" },
+                        { "XAML", "XAML" }
+                    };
 
-                            if (_textView.Properties.TryGetProperty(typeof(OllamaCommandFilter), out OllamaCommandFilter delayedFilter))
+                    if (languageMap.ContainsKey(contentType))
+                    {
+                        return languageMap[contentType];
+                    }
+
+                    // 2. Try to determine by file name
+                    if (_textView.TextBuffer.Properties.TryGetProperty(typeof(ITextDocument), out ITextDocument textDocument))
+                    {
+                        var fileName = textDocument.FilePath;
+                        if (!string.IsNullOrEmpty(fileName))
+                        {
+                            var extension = Path.GetExtension(fileName).ToLowerInvariant();
+                            System.Diagnostics.Debug.WriteLine($"File extension: {extension}");
+
+                            var extensionMap = new Dictionary<string, string>
                             {
-                                delayedFilter.SetSuggestionAdornment(_suggestionAdornment);
-                                System.Diagnostics.Debug.WriteLine("CommandFilter configurato con successo (delayed)");
-                            }
-                            else
+                                { ".cs", "C#" },
+                                { ".cpp", "C++" },
+                                { ".cc", "C++" },
+                                { ".cxx", "C++" },
+                                { ".c", "C" },
+                                { ".h", "C/C++" },
+                                { ".hpp", "C++" },
+                                { ".js", "JavaScript" },
+                                { ".ts", "TypeScript" },
+                                { ".py", "Python" },
+                                { ".java", "Java" },
+                                { ".html", "HTML" },
+                                { ".htm", "HTML" },
+                                { ".css", "CSS" },
+                                { ".xml", "XML" },
+                                { ".json", "JSON" },
+                                { ".sql", "SQL" },
+                                { ".ps1", "PowerShell" },
+                                { ".vb", "Visual Basic" },
+                                { ".fs", "F#" },
+                                { ".xaml", "XAML" },
+                                { ".php", "PHP" },
+                                { ".rb", "Ruby" },
+                                { ".go", "Go" },
+                                { ".rs", "Rust" },
+                                { ".kt", "Kotlin" },
+                                { ".swift", "Swift" }
+                            };
+
+                            if (extensionMap.ContainsKey(extension))
                             {
-                                System.Diagnostics.Debug.WriteLine("CommandFilter ancora non trovato dopo delay");
+                                return extensionMap[extension];
                             }
+                        }
+                    }
+
+                    // 3. Try to determine by file content
+                    var text = _textView.TextSnapshot.GetText();
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        // Search for language-specific patterns
+                        if (text.Contains("using System") || text.Contains("namespace ") || text.Contains("public class"))
+                            return "C#";
+                        if (text.Contains("#include") || text.Contains("std::"))
+                            return "C++";
+                        if (text.Contains("function ") || text.Contains("var ") || text.Contains("const ") || text.Contains("let "))
+                            return "JavaScript";
+                        if (text.Contains("def ") || text.Contains("import ") || text.Contains("from "))
+                            return "Python";
+                        if (text.Contains("public static void main") || text.Contains("import java"))
+                            return "Java";
+                        if (text.Contains("<!DOCTYPE") || text.Contains("<html"))
+                            return "HTML";
+                    }
+
+                    System.Diagnostics.Debug.WriteLine("Language not determined, using 'text' as default");
+                    return "text";
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error determining language: {ex.Message}");
+                    return "text";
+                }
+            }
+
+            private void SetupCommandFilter()
+            {
+                try
+                {
+                    // Get the command filter from TextView properties
+                    if (_textView.Properties.TryGetProperty(typeof(OllamaCommandFilter), out OllamaCommandFilter commandFilter))
+                    {
+                        commandFilter.SetSuggestionAdornment(_suggestionAdornment);
+                        System.Diagnostics.Debug.WriteLine("CommandFilter configured successfully");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("CommandFilter not found in properties");
+                        // Try after a short delay
+                        System.Threading.Tasks.Task.Delay(100).ContinueWith(_ =>
+                        {
+                            Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.Run(async () =>
+                            {
+                                await Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                                if (_textView.Properties.TryGetProperty(typeof(OllamaCommandFilter), out OllamaCommandFilter delayedFilter))
+                                {
+                                    delayedFilter.SetSuggestionAdornment(_suggestionAdornment);
+                                    System.Diagnostics.Debug.WriteLine("CommandFilter configured successfully (delayed)");
+                                }
+                                else
+                                {
+                                    System.Diagnostics.Debug.WriteLine("CommandFilter still not found after delay");
+                                }
+                            });
                         });
-                    });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error configuring CommandFilter: {ex.Message}");
                 }
             }
-            catch (Exception ex)
+
+            private void OnTextViewClosed(object sender, EventArgs e)
             {
-                System.Diagnostics.Debug.WriteLine($"Errore nella configurazione del CommandFilter: {ex.Message}");
+                _debounceTimer?.Dispose();
+                _suggestionAdornment?.Dispose();
+                _textView.TextBuffer.Changed -= OnTextChanged;
+                _textView.Closed -= OnTextViewClosed;
             }
-        }
 
-
-        private void OnTextViewClosed(object sender, System.EventArgs e)
-        {
-            _debounceTimer?.Dispose();
-            _suggestionAdornment?.Dispose();
-            _textView.TextBuffer.Changed -= OnTextChanged;
-            _textView.Closed -= OnTextViewClosed;
-        }
-
-        private void OnTextChanged(object sender, TextContentChangedEventArgs e)
-        {
-            // Nascondi il suggerimento corrente quando l'utente scrive
-            _suggestionAdornment.HideSuggestion();
-
-            // Usa un timer per evitare troppe chiamate durante la digitazione
-            _debounceTimer?.Dispose();
-            _debounceTimer = new System.Threading.Timer(OnDebounceTimerElapsed, null, DEBOUNCE_DELAY_MS, System.Threading.Timeout.Infinite);
-        }
-
-        private async void OnDebounceTimerElapsed(object state)
-        {
-            if (_isProcessing || _llmManager.IsRequestActive)
-                return;
-
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            try
+            private void OnTextChanged(object sender, TextContentChangedEventArgs e)
             {
-                var caretPosition = _textView.Caret.Position.BufferPosition;
-                var codeBefore = _textView.TextSnapshot.GetText(0, caretPosition.Position);
-                var codeAfter = _textView.TextSnapshot.GetText(caretPosition.Position, _textView.TextSnapshot.Length - caretPosition.Position);
+                // Hide current suggestion when user is typing
+                _suggestionAdornment.HideSuggestion();
 
-                // Non suggerire se il testo è troppo corto o finisce con spazio/newline
-                if (codeBefore.Length < 10 ||
-                    codeBefore.EndsWith(" ") ||
-                    codeBefore.EndsWith("\n") ||
-                    codeBefore.EndsWith("\r\n"))
-                {
+                // Use a timer to avoid too many calls during typing
+                _debounceTimer?.Dispose();
+                _debounceTimer = new System.Threading.Timer(OnDebounceTimerElapsed, null, DEBOUNCE_DELAY_MS, System.Threading.Timeout.Infinite);
+            }
+
+            private async void OnDebounceTimerElapsed(object state)
+            {
+                if (_isProcessing || _llmManager.IsRequestActive)
                     return;
-                }
-                System.Diagnostics.Debug.WriteLine($"Richiesta suggerimento per testo: {codeBefore}");
-                System.Diagnostics.Debug.WriteLine($"Richiesta suggerimento per posizione: {caretPosition.Position}");
 
-                _isProcessing = true;
-
-                string response = await _llmManager.GetCodeCompletionAsync(codeBefore, codeAfter);
-
-                if (!string.IsNullOrWhiteSpace(response))
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                try
                 {
-                    string cleanSuggestion = ExtractNewCodeFromResponse(response, codeBefore);
-                    if (!string.IsNullOrWhiteSpace(cleanSuggestion))
+                    var caretPosition = _textView.Caret.Position.BufferPosition;
+                    var codeBefore = _textView.TextSnapshot.GetText(0, caretPosition.Position);
+                    var codeAfter = _textView.TextSnapshot.GetText(caretPosition.Position, _textView.TextSnapshot.Length - caretPosition.Position);
+
+                    // Don't suggest if text is too short or ends with space/newline
+                    if (codeBefore.Length < 10 ||
+                        codeBefore.EndsWith(" ") ||
+                        codeBefore.EndsWith("\n") ||
+                        codeBefore.EndsWith("\r\n"))
                     {
-                        // Verifica che il cursore sia ancora nella stessa posizione
-                        var currentCaretPosition = _textView.Caret.Position.BufferPosition.Position;
-                        if (currentCaretPosition == caretPosition.Position)
+                        return;
+                    }
+
+                    // Determine programming language
+                    string language = GetProgrammingLanguage();
+                    System.Diagnostics.Debug.WriteLine($"Requesting suggestion for text: {codeBefore}");
+                    System.Diagnostics.Debug.WriteLine($"Requesting suggestion for position: {caretPosition.Position}");
+                    System.Diagnostics.Debug.WriteLine($"Detected language: {language}");
+
+                    _isProcessing = true;
+
+                    // Pass also the language to the function
+                    string response = await _llmManager.GetCodeCompletionAsync(codeBefore, codeAfter, language);
+                    if (!string.IsNullOrWhiteSpace(response))
+                    {
+                        string cleanSuggestion = ExtractNewCodeFromResponse(response, codeBefore);
+                        if (!string.IsNullOrWhiteSpace(cleanSuggestion))
                         {
-                            _suggestionAdornment.ShowSuggestion(cleanSuggestion, caretPosition.Position);
+                            // Check that the cursor is still at the same position
+                            var currentCaretPosition = _textView.Caret.Position.BufferPosition.Position;
+                            if (currentCaretPosition == caretPosition.Position)
+                            {
+                                _suggestionAdornment.ShowSuggestion(cleanSuggestion, caretPosition.Position);
+                            }
                         }
                     }
                 }
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Errore durante il completamento AI: {ex.Message}");
-            }
-            finally
-            {
-                _isProcessing = false;
-            }
-        }
-
-        private string ExtractNewCodeFromResponse(string response, string originalCode)
-        {
-            try
-            {
-                // Rimuovi code blocks se presenti
-                string cleanResponse = RemoveCodeBlocks(response);
-
-                // Rimuovi il codice originale se è presente nella risposta
-                string newCode = RemoveOriginalCode(cleanResponse, originalCode);
-
-                // Pulisci spazi e newline extra
-                newCode = newCode.Trim();
-
-                // Se il nuovo codice è troppo lungo, prendi solo la prima riga
-                var lines = newCode.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                if (lines.Length > 0)
+                catch (Exception ex)
                 {
-                    newCode = lines[0].Trim();
+                    System.Diagnostics.Debug.WriteLine($"Error during AI completion: {ex.Message}");
                 }
-
-                System.Diagnostics.Debug.WriteLine($"Codice originale: {originalCode}");
-                System.Diagnostics.Debug.WriteLine($"Risposta completa: {response}");
-                System.Diagnostics.Debug.WriteLine($"Nuovo codice estratto: {newCode}");
-
-                return newCode;
-            }
-            catch (System.Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Errore nell'estrazione del codice: {ex.Message}");
-                return string.Empty;
-            }
-        }
-
-        private string RemoveCodeBlocks(string text)
-        {
-            // Rimuovi code blocks markdown (```...```)
-            var codeBlockPattern = @"```[\s\S]*?```";
-            var matches = Regex.Matches(text, codeBlockPattern);
-
-            if (matches.Count > 0)
-            {
-                // Prendi il contenuto del primo code block
-                var match = matches[0];
-                var content = match.Value;
-                // Rimuovi i delimitatori ``` e eventuali specificatori di linguaggio
-                content = Regex.Replace(content, @"^```\w*\s*", "", RegexOptions.Multiline);
-                content = Regex.Replace(content, @"```$", "", RegexOptions.Multiline);
-                return content.Trim();
-            }
-
-            // Se non ci sono code blocks, ritorna il testo originale
-            return text;
-        }
-
-        private string RemoveOriginalCode(string response, string originalCode)
-        {
-            // Se la risposta contiene il codice originale, rimuovilo
-            if (response.Contains(originalCode))
-            {
-                int index = response.IndexOf(originalCode);
-                if (index >= 0)
+                finally
                 {
-                    // Prendi tutto quello che viene dopo il codice originale
-                    string afterOriginal = response.Substring(index + originalCode.Length);
-                    return afterOriginal.Trim();
+                    _isProcessing = false;
                 }
             }
 
-            // Se il codice originale non è presente, controlla se la risposta inizia con parte del codice originale
-            var originalLines = originalCode.Split('\n');
-            var responseLines = response.Split('\n');
-
-            // Trova dove inizia il nuovo codice
-            int skipLines = 0;
-            for (int i = 0; i < Math.Min(originalLines.Length, responseLines.Length); i++)
+            private string ExtractNewCodeFromResponse(string response, string originalCode)
             {
-                if (originalLines[originalLines.Length - 1 - i].Trim() == responseLines[i].Trim())
+                try
                 {
-                    skipLines = i + 1;
+                    // Remove code blocks if present
+                    string cleanResponse = RemoveCodeBlocks(response);
+
+                    // Remove the original code if present in the response
+                    string newCode = RemoveOriginalCode(cleanResponse, originalCode);
+
+                    // Clean extra spaces and newlines
+                    newCode = newCode.Trim();
+
+                    // If the new code is too long, take only the first line
+                    var lines = newCode.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (lines.Length > 0)
+                    {
+                        newCode = lines[0].Trim();
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"Original code: {originalCode}");
+                    System.Diagnostics.Debug.WriteLine($"Full response: {response}");
+                    System.Diagnostics.Debug.WriteLine($"Extracted new code: {newCode}");
+
+                    return newCode;
                 }
-                else
+                catch (Exception ex)
                 {
-                    break;
+                    System.Diagnostics.Debug.WriteLine($"Error extracting code: {ex.Message}");
+                    return string.Empty;
                 }
             }
 
-            if (skipLines > 0 && skipLines < responseLines.Length)
+            private string RemoveCodeBlocks(string text)
             {
-                return string.Join("\n", responseLines.Skip(skipLines));
+                // Remove markdown code blocks (```...```)
+                var codeBlockPattern = @"```[\s\S]*?```";
+                var matches = Regex.Matches(text, codeBlockPattern);
+                if (matches.Count > 0)
+                {
+                    // Take the content of the first code block
+                    var match = matches[0];
+                    var content = match.Value;
+
+                    // Remove delimiters ``` and optional language specifier
+                    content = Regex.Replace(content, @"^```\w*\s*", "", RegexOptions.Multiline);
+                    content = Regex.Replace(content, @"```$", "", RegexOptions.Multiline);
+
+                    return content.Trim();
+                }
+
+                // If no code blocks are found, return original text
+                return text;
             }
 
-            return response;
+            private string RemoveOriginalCode(string response, string originalCode)
+            {
+                // If response contains original code, remove it
+                if (response.Contains(originalCode))
+                {
+                    int index = response.IndexOf(originalCode);
+                    if (index >= 0)
+                    {
+                        // Take everything after the original code
+                        string afterOriginal = response.Substring(index + originalCode.Length);
+                        return afterOriginal.Trim();
+                    }
+                }
+
+                // If original code is not present, check if the response starts with part of it
+                var originalLines = originalCode.Split('\n');
+                var responseLines = response.Split('\n');
+
+                // Find where new code starts
+                int skipLines = 0;
+                for (int i = 0; i < Math.Min(originalLines.Length, responseLines.Length); i++)
+                {
+                    if (originalLines[originalLines.Length - 1 - i].Trim() == responseLines[i].Trim())
+                    {
+                        skipLines = i + 1;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (skipLines > 0 && skipLines < responseLines.Length)
+                {
+                    return string.Join("\n", responseLines.Skip(skipLines));
+                }
+
+                return response;
+            }
         }
     }
 }

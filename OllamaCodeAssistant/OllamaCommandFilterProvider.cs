@@ -23,7 +23,7 @@ namespace OllamaCodeAssistant
             IWpfTextView textView = AdapterService.GetWpfTextView(textViewAdapter);
             if (textView == null)
             {
-                System.Diagnostics.Debug.WriteLine("Impossibile ottenere WpfTextView");
+                System.Diagnostics.Debug.WriteLine("Unable to get WpfTextView");
                 return;
             }
 
@@ -34,34 +34,34 @@ namespace OllamaCodeAssistant
         {
             try
             {
-                // Ottieni il command target corrente
+                // Get the current command target
                 IOleCommandTarget next;
                 int hr = textViewAdapter.AddCommandFilter(null, out next);
                 if (ErrorHandler.Failed(hr))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Errore nell'ottenere il command target: {hr}");
+                    System.Diagnostics.Debug.WriteLine($"Error getting command target: {hr}");
                     return;
                 }
 
-                // Crea il nostro command filter
+                // Create our command filter
                 var commandFilter = new OllamaCommandFilter(textView, next);
 
-                // Aggiungi il nostro filter alla catena
+                // Add our filter to the chain
                 hr = textViewAdapter.AddCommandFilter(commandFilter, out next);
                 if (ErrorHandler.Succeeded(hr))
                 {
-                    // Salva il command filter nelle proprietà della text view per poterlo recuperare dopo
+                    // Save the command filter in the text view's properties for later retrieval
                     textView.Properties.AddProperty(typeof(OllamaCommandFilter), commandFilter);
-                    System.Diagnostics.Debug.WriteLine("OllamaCommandFilter aggiunto con successo");
+                    System.Diagnostics.Debug.WriteLine("OllamaCommandFilter successfully added");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Errore nell'aggiungere il command filter: {hr}");
+                    System.Diagnostics.Debug.WriteLine($"Error adding command filter: {hr}");
                 }
             }
             catch (System.Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Eccezione nell'aggiungere il command filter: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Exception while adding command filter: {ex.Message}");
             }
         }
     }

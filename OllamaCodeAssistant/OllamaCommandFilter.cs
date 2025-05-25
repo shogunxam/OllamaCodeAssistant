@@ -15,13 +15,13 @@ namespace OllamaCodeAssistant
         {
             _textView = textView;
             _nextCommandTarget = nextCommandTarget;
-            System.Diagnostics.Debug.WriteLine("OllamaCommandFilter creato");
+            System.Diagnostics.Debug.WriteLine("OllamaCommandFilter created");
         }
 
         public void SetSuggestionAdornment(InlineSuggestionAdornment adornment)
         {
             _suggestionAdornment = adornment;
-            System.Diagnostics.Debug.WriteLine("SuggestionAdornment impostato nel CommandFilter");
+            System.Diagnostics.Debug.WriteLine("SuggestionAdornment set in CommandFilter");
         }
 
         public int QueryStatus(ref Guid pguidCmdGroup, uint cCmds, OLECMD[] prgCmds, IntPtr pCmdText)
@@ -35,78 +35,81 @@ namespace OllamaCodeAssistant
 
             if (_suggestionAdornment != null && _suggestionAdornment.IsVisible)
             {
-                System.Diagnostics.Debug.WriteLine($"Suggerimento visibile, controllo comando: {nCmdID}");
+                System.Diagnostics.Debug.WriteLine($"Suggestion visible, checking command: {nCmdID}");
 
-                // Verifica che il cursore sia ancora nella posizione corretta
+                // Check that the cursor is still at the correct position
                 var currentCaretPosition = _textView.Caret.Position.BufferPosition.Position;
                 if (!_suggestionAdornment.IsCaretAtSuggestionPosition(currentCaretPosition))
                 {
-                    System.Diagnostics.Debug.WriteLine("Cursore non nella posizione del suggerimento, nascondo");
+                    System.Diagnostics.Debug.WriteLine("Cursor not at suggestion position, hiding suggestion");
                     _suggestionAdornment.HideSuggestion();
                     return _nextCommandTarget.Exec(ref pguidCmdGroup, nCmdID, nCmdexecopt, pvaIn, pvaOut);
                 }
 
-                // Verifica se è un comando che ci interessa
+                // Check if it's a command we are interested in
                 if (pguidCmdGroup == VSConstants.VSStd2K)
                 {
                     switch (nCmdID)
                     {
                         case (uint)VSConstants.VSStd2KCmdID.TAB:
-                            System.Diagnostics.Debug.WriteLine("Tab intercettato dal CommandFilter");
+                            System.Diagnostics.Debug.WriteLine("Tab intercepted by CommandFilter");
                             if (_suggestionAdornment.AcceptSuggestion())
                             {
-                                System.Diagnostics.Debug.WriteLine("Suggerimento accettato con Tab - BLOCCANDO PROPAGAZIONE");
-                                return VSConstants.S_OK; // Blocca la propagazione
+                                System.Diagnostics.Debug.WriteLine("Suggestion accepted with Tab - BLOCKING PROPAGATION");
+                                return VSConstants.S_OK; // Block propagation
                             }
                             break;
 
                         case (uint)VSConstants.VSStd2KCmdID.RETURN:
-                            System.Diagnostics.Debug.WriteLine("Enter intercettato dal CommandFilter");
-                            if (_suggestionAdornment.AcceptSuggestion())
-                            {
-                                System.Diagnostics.Debug.WriteLine("Suggerimento accettato con Enter - BLOCCANDO PROPAGAZIONE");
-                                return VSConstants.S_OK; // Blocca la propagazione
-                            }
+                            _suggestionAdornment.HideSuggestion();
                             break;
-
+                        /*
+                        System.Diagnostics.Debug.WriteLine("Enter intercepted by CommandFilter");
+                        if (_suggestionAdornment.AcceptSuggestion())
+                        {
+                            System.Diagnostics.Debug.WriteLine("Suggestion accepted with Enter - BLOCKING PROPAGATION");
+                            return VSConstants.S_OK; // Block propagation
+                        }
+                        break;
+                        */
                         case (uint)VSConstants.VSStd2KCmdID.RIGHT:
-                            System.Diagnostics.Debug.WriteLine("Freccia destra intercettata dal CommandFilter");
+                            System.Diagnostics.Debug.WriteLine("Right arrow intercepted by CommandFilter");
                             if (IsAtEndOfLine() && _suggestionAdornment.AcceptSuggestion())
                             {
-                                System.Diagnostics.Debug.WriteLine("Suggerimento accettato con freccia destra - BLOCCANDO PROPAGAZIONE");
-                                return VSConstants.S_OK; // Blocca la propagazione
+                                System.Diagnostics.Debug.WriteLine("Suggestion accepted with Right arrow - BLOCKING PROPAGATION");
+                                return VSConstants.S_OK; // Block propagation
                             }
                             break;
 
                         case (uint)VSConstants.VSStd2KCmdID.CANCEL:
-                            System.Diagnostics.Debug.WriteLine("Escape intercettato dal CommandFilter");
+                            System.Diagnostics.Debug.WriteLine("Escape intercepted by CommandFilter");
                             _suggestionAdornment.HideSuggestion();
                             return VSConstants.S_OK;
 
                         case (uint)VSConstants.VSStd2KCmdID.END:
-                            System.Diagnostics.Debug.WriteLine("End intercettato dal CommandFilter");
+                            System.Diagnostics.Debug.WriteLine("End intercepted by CommandFilter");
                             if (_suggestionAdornment.AcceptSuggestion())
                             {
-                                System.Diagnostics.Debug.WriteLine("Suggerimento accettato con End - BLOCCANDO PROPAGAZIONE");
-                                return VSConstants.S_OK; // Blocca la propagazione
+                                System.Diagnostics.Debug.WriteLine("Suggestion accepted with End - BLOCKING PROPAGATION");
+                                return VSConstants.S_OK; // Block propagation
                             }
                             break;
 
                         case (uint)VSConstants.VSStd2KCmdID.BACKSPACE:
                         case (uint)VSConstants.VSStd2KCmdID.DELETE:
-                            System.Diagnostics.Debug.WriteLine($"Backspace/Delete intercettato, nascondo suggerimento");
+                            System.Diagnostics.Debug.WriteLine("Backspace/Delete intercepted, hiding suggestion");
                             _suggestionAdornment.HideSuggestion();
                             break;
 
                         case (uint)VSConstants.VSStd2KCmdID.TYPECHAR:
-                            System.Diagnostics.Debug.WriteLine("Carattere digitato, nascondo suggerimento");
+                            System.Diagnostics.Debug.WriteLine("Character typed, hiding suggestion");
                             _suggestionAdornment.HideSuggestion();
                             break;
                     }
                 }
             }
 
-            // Passa il comando al prossimo handler
+            // Pass the command to the next handler
             return _nextCommandTarget.Exec(ref pguidCmdGroup, nCmdID, nCmdexecopt, pvaIn, pvaOut);
         }
 

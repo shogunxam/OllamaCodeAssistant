@@ -172,7 +172,7 @@ namespace OllamaCodeAssistant {
       }
     }
 
-        public async Task<string> GetCodeCompletionAsync(string codeBefore, string codeAfter)
+        public async Task<string> GetCodeCompletionAsync(string codeBefore, string codeAfter, string language = null)
         {
             if (IsRequestActive)
             {
@@ -189,7 +189,7 @@ namespace OllamaCodeAssistant {
 
                 // Prompt ottimizzato per il completamento del codice
 
-                string prompt = $@"You are an expert code autocompleter. Given the full context of the code — both before and after the cursor — generate only the minimal and logically correct completion at the current cursor position. Do not repeat existing keywords or syntax already present.
+                string prompt = $@"You are an expert {language} code autocompleter. Given the full context of the code — both before and after the cursor — generate only the minimal and logically correct completion at the current cursor position. Do not repeat existing keywords or syntax already present.
 
 Do not add explanations, comments, or markdown formatting. Output only the new code needed to complete the current statement or structure.
 
@@ -200,16 +200,6 @@ Existing code after cursor:
 {codeAfter}
 
 Completion:";
-                /*
-                string prompt = $@"Complete the following code with just the next logical line or statement. 
-                Return ONLY the new code without any explanations, comments, or code block markers.
-                Do not repeat the existing code.
-
-                Existing code:
-                {codeContext}
-
-                New code:";
-                */
 
                 var messages = new List<ChatMessage> { new ChatMessage(ChatRole.User, prompt) };
                 var response = await _chatClient.GetResponseAsync(messages, cancellationToken: _activeRequestCancellationTokenSource.Token);

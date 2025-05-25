@@ -12,15 +12,16 @@ namespace OllamaCodeAssistant
         [Export(typeof(AdornmentLayerDefinition))]
         [Name("InlineSuggestion")]
         [Order(After = PredefinedAdornmentLayers.Text, Before = PredefinedAdornmentLayers.Caret)]
-        [Order(Before = "Completion")] // Prima del layer di completamento di IntelliCode
-        [Order(Before = "Suggestion")] // Prima del layer di suggerimenti di IntelliCode
+        [Order(Before = "Completion")] // Before IntelliCode's completion layer
+        [Order(Before = "Suggestion")] // Before IntelliCode's suggestion layer
         public AdornmentLayerDefinition InlineSuggestionLayerDefinition = null;
 
         public void TextViewCreated(IWpfTextView textView)
         {
-            // Questo factory si occupa solo di registrare il layer di adornment
-            // L'adornment effettivo viene creato dal TextViewEventListener
+            // This factory is responsible only for registering the adornment layer
+            // The actual adornment is created by the TextViewEventListener
             System.Diagnostics.Debug.WriteLine("InlineSuggestionAdornmentFactory: TextViewCreated");
         }
     }
+} }
 }
