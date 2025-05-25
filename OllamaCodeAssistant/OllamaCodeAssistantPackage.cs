@@ -5,6 +5,7 @@ using Microsoft.VisualStudio.Shell;
 using Task = System.Threading.Tasks.Task;
 
 namespace OllamaCodeAssistant {
+
   /// <summary>
   /// This is the class that implements the package exposed by this assembly.
   /// </summary>
@@ -28,6 +29,7 @@ namespace OllamaCodeAssistant {
   [ProvideToolWindow(typeof(ChatToolWindow))]
   [ProvideOptionPage(typeof(OllamaCodeAssistant.Options.OllamaOptionsPage), "Ollama Code Assistant", "General", 0, 0, true)]
   public sealed class OllamaCodeAssistantPackage : AsyncPackage {
+
     /// <summary>
     /// OllamaCodeAssistantPackage GUID string.
     /// </summary>
@@ -46,9 +48,10 @@ namespace OllamaCodeAssistant {
       // When initialized asynchronously, the current thread may be a background thread at this point.
       // Do any initialization that requires the UI thread after switching to the UI thread.
       await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-    await ChatToolWindowCommand.InitializeAsync(this);
+      await ChatToolWindowCommand.InitializeAsync(this);
+      await ExecuteExplainErrorCommand.InitializeAsync(this);
     }
 
-    #endregion
+    #endregion Package Members
   }
 }

@@ -104,5 +104,38 @@ namespace OllamaCodeAssistant {
       activeProject = dte?.ActiveDocument?.ProjectItem?.ContainingProject;
       return activeProject != null;
     }
+
+    public static void GetErrors() {
+      ThreadHelper.ThrowIfNotOnUIThread();
+
+      var dte = (DTE2)Package.GetGlobalService(typeof(DTE));
+      var errorItems = dte?.ToolWindows?.ErrorList?.ErrorItems;
+
+      if (errorItems != null && errorItems.Count > 0) {
+        var selectedItem = GetSelectedErrorItem(errorItems);
+        if (selectedItem != null) {
+          string message = selectedItem.Description;
+          string file = selectedItem.FileName;
+          int line = selectedItem.Line;
+
+          // TODO: Call your LLM here with this context
+          System.Diagnostics.Debug.WriteLine($"Error: {message} in {file} at line {line}");
+        }
+      }
+    }
+
+    private static ErrorItem GetSelectedErrorItem(ErrorItems items) {
+      ThreadHelper.ThrowIfNotOnUIThread();
+
+      for (int i = 1; i <= items.Count; i++) // 1-based index
+      {
+        var item = items.Item(i);
+        if (!string.IsNullOrEmpty(item?.Description)) {
+          return item; // crude filter — can be refined
+        }
+      }
+
+      return null;
+    }
   }
 }
