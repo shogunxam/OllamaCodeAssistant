@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.Shell;
@@ -105,7 +106,7 @@ namespace OllamaCodeAssistant {
       return activeProject != null;
     }
 
-    public static void GetErrors() {
+    public static ErrorListItem GetSelectedError() {
       ThreadHelper.ThrowIfNotOnUIThread();
 
       var dte = (DTE2)Package.GetGlobalService(typeof(DTE));
@@ -113,15 +114,13 @@ namespace OllamaCodeAssistant {
 
       if (errorItems != null && errorItems.Count > 0) {
         var selectedItem = GetSelectedErrorItem(errorItems);
-        if (selectedItem != null) {
-          string message = selectedItem.Description;
-          string file = selectedItem.FileName;
-          int line = selectedItem.Line;
 
-          // TODO: Call your LLM here with this context
-          System.Diagnostics.Debug.WriteLine($"Error: {message} in {file} at line {line}");
+        if (selectedItem != null) {
+          return new ErrorListItem(selectedItem);
         }
       }
+
+      return null; // No selected error item found
     }
 
     private static ErrorItem GetSelectedErrorItem(ErrorItems items) {
@@ -136,6 +135,36 @@ namespace OllamaCodeAssistant {
       }
 
       return null;
+    }
+
+    public class ErrorListItem {
+
+      public enum Level {
+        Low = 1,
+        Medium = 2,
+        High = 4
+      }
+
+      public Level ErrorLevel { get; }
+
+      public string Description { get; }
+
+      public string FileName { get; }
+
+      public int Line { get; }
+
+      public int Column { get; }
+
+      public string Project { get; }
+
+      public ErrorListItem(ErrorItem errorItem) {
+        ErrorLevel = (Level)errorItem.ErrorLevel;
+        Description = errorItem.Description;
+        FileName = errorItem.FileName;
+        Line = errorItem.Line;
+        Column = errorItem.Column;
+        Project = errorItem.Project;
+      }
     }
   }
 }

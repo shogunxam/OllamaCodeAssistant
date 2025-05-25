@@ -59,7 +59,18 @@ namespace OllamaCodeAssistant {
     }
 
     private void Execute(object sender, EventArgs e) {
-      Debug.WriteLine("ExecuteExplainErrorCommand.Execute() called. v2");
+      var error = DETService.GetSelectedError();
+      if (error == null) {
+        return;
+      }
+
+      Debug.WriteLine($"Description: {error.Description}");
+      Debug.WriteLine($"FileName: {error.FileName}");
+      Debug.WriteLine($"Line: {error.Line}");
+      Debug.WriteLine($"Column: {error.Column}");
+      Debug.WriteLine($"Project: {error.Project}");
+      Debug.WriteLine($"ErrorLevel: {error.ErrorLevel}");
+
     }
 
   }
