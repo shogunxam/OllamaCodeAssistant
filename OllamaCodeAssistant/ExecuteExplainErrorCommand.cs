@@ -70,8 +70,10 @@ namespace OllamaCodeAssistant {
       Debug.WriteLine($"Project: {error.Project}");
       Debug.WriteLine($"ErrorLevel: {error.ErrorLevel}");
 
+      var fullPrompt = PromptManager.BuildPrompt(error);
+
       // Example of using LLMInteractionManager
-      _llmInteractionManager.HandleUserMessageAsync(error.Description, false, false, false);
+      _llmInteractionManager.HandleUserMessageAsync($"Help me troubleshoot this error: {error.Description}", fullPrompt);
     }
   }
 }

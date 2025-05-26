@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.Shell;
@@ -140,9 +139,9 @@ namespace OllamaCodeAssistant {
     public class ErrorListItem {
 
       public enum Level {
-        Low = 1,
-        Medium = 2,
-        High = 4
+        Message = 1,
+        Warning = 2,
+        Error = 4
       }
 
       public Level ErrorLevel { get; }
