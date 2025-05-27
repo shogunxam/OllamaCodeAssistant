@@ -1,5 +1,8 @@
-﻿using System.Text;
+﻿using System.IO;
+using System.Linq;
+using System.Text;
 using OllamaCodeAssistant.Helpers;
+using static OllamaCodeAssistant.DETService;
 
 namespace OllamaCodeAssistant {
 
@@ -52,6 +55,25 @@ namespace OllamaCodeAssistant {
       }
 
       return finalPrompt.ToString();
+    }
+
+    public static string BuildPrompt(ErrorListItem errorListItem) {
+      var result = new StringBuilder();
+
+      result.AppendLine($"You are an AI code assistant running in Visual Studio.");
+      result.AppendLine($"The compiler is reporting an '{errorListItem.ErrorLevel}' with the description '{errorListItem.Description}'");
+      result.AppendLine($"The error description is in file '{errorListItem.FileName}' which is part of the project '{errorListItem.Project}'");
+      result.AppendLine($"");
+      result.AppendLine($"Here is the contents of the file:");
+      result.AppendLine($"```{File.ReadAllText(errorListItem.FileName)}```");
+      result.AppendLine("");
+      result.AppendLine($"The error is on line {errorListItem.Line} column {errorListItem.Column}.");
+      result.AppendLine($"Here is that line of code:");
+      result.AppendLine($"```{File.ReadLines(errorListItem.FileName).Skip(errorListItem.Line - 1).FirstOrDefault()}```");
+      result.AppendLine("");
+      result.AppendLine($"I need you to provide a solution to this error.");
+
+      return result.ToString();
     }
   }
 }

@@ -30,10 +30,12 @@ namespace OllamaCodeAssistant {
     private async Task InitializeControlAsync() {
       Loaded -= ControlLoaded; // Unsubscribe from the event to prevent multiple calls
 
-      _llmInteractionManager = new LLMInteractionManager(GetExtensionOptions());
+      var package = _chatToolWindow?.Package as OllamaCodeAssistantPackage;
+      _llmInteractionManager = package?.GetLLMInteractionManager() ?? throw new ApplicationException("Unable to load LLM Interaction Manager");
+
       _llmInteractionManager.OnResponseReceived += AppendMessageToUI;
       _llmInteractionManager.OnErrorOccurred += DisplayError;
-      _llmInteractionManager.OnLogEntryReceived += AppendMessageToLog; ;
+      _llmInteractionManager.OnLogEntryReceived += AppendMessageToLog;
 
       await PopulateModelSelectionComboBox(_llmInteractionManager.Options);
 
@@ -75,7 +77,8 @@ namespace OllamaCodeAssistant {
     #region UI Helpers
 
     public void AskLLM(string message) {
-      _llmInteractionManager.HandleUserMessageAsync(message, false, true, false);
+      var fullPrompt = PromptManager.BuildPrompt(message, false, true, false);
+      _llmInteractionManager.HandleUserMessageAsync(message, fullPrompt);
     }
 
     private void DisplayError(string message) {
@@ -171,11 +174,13 @@ namespace OllamaCodeAssistant {
         UserInputTextBox.Clear();
         SubmitButton.Content = "Stop";
 
-        await _llmInteractionManager.HandleUserMessageAsync(
-            userPrompt,
-            ContextIncludeSelection.IsChecked == true,
-            ContextIncludeFile.IsChecked == true,
-            ContextIncludeAllOpenFile.IsChecked == true);
+        var fullPrompt = PromptManager.BuildPrompt(
+          userPrompt,
+          ContextIncludeSelection.IsChecked == true,
+          ContextIncludeFile.IsChecked == true,
+          ContextIncludeAllOpenFile.IsChecked == true);
+
+        await _llmInteractionManager.HandleUserMessageAsync(userPrompt, fullPrompt);
       } catch (Exception ex) {
         DisplayError(ex.Message);
       } finally {
