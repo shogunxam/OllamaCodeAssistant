@@ -2,10 +2,12 @@
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using OllamaCodeAssistant.Options;
@@ -26,6 +28,8 @@ namespace OllamaCodeAssistant {
     }
 
     #region Event Handlers
+
+#pragma warning disable VSTHRD100 // Avoid async void methods
 
     private async Task InitializeControlAsync() {
       Loaded -= ControlLoaded; // Unsubscribe from the event to prevent multiple calls
@@ -54,10 +58,9 @@ namespace OllamaCodeAssistant {
 
     private async void ControlLoaded(object sender, RoutedEventArgs e) => await InitializeControlAsync();
 
-    private void TextViewTrackerSelectionChanged(object sender, string e) {
-      Dispatcher.BeginInvoke((Action)(() => {
-        ContextIncludeSelection.IsChecked = !string.IsNullOrEmpty(e);
-      }));
+    private async void TextViewTrackerSelectionChanged(object sender, string e) {
+      await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+      ContextIncludeSelection.IsChecked = !string.IsNullOrEmpty(e);
     }
 
     private async void RenderMarkdownClicked(object sender, RoutedEventArgs e) {
@@ -72,39 +75,50 @@ namespace OllamaCodeAssistant {
       _llmInteractionManager.Options.DefaultModel = ModelSelectionComboBox.SelectedItem.ToString();
     }
 
+#pragma warning restore VSTHRD100 // Avoid async void methods
+
     #endregion Event Handlers
 
     #region UI Helpers
 
-    public void AskLLM(string message) {
+    public async Task AskLLM(string message) {
       var fullPrompt = PromptManager.BuildPrompt(message, false, true, false);
-      _llmInteractionManager.HandleUserMessageAsync(message, fullPrompt);
+      try {
+        await _llmInteractionManager.HandleUserMessageAsync(message, fullPrompt);
+        ClearError();
+      } catch (Exception ex) {
+        DisplayError(ex.Message);
+      }
     }
 
     private void DisplayError(string message) {
-      Dispatcher.BeginInvoke((Action)(() => {
+      RunOnUIThreadAsync(() => {
         ErrorDisplayBorder.Visibility = Visibility.Visible;
         ErrorDisplayTextBlock.Text = message;
-      }));
+        return Task.CompletedTask;
+      });
     }
 
     private void ClearError() {
-      Dispatcher.BeginInvoke((Action)(() => {
+      RunOnUIThreadAsync(() => {
         ErrorDisplayTextBlock.Text = string.Empty;
         ErrorDisplayBorder.Visibility = Visibility.Collapsed;
-      }));
+        return Task.CompletedTask;
+      });
     }
 
     private void AppendMessageToUI(string message) {
-      Dispatcher.BeginInvoke((Action)(() => {
+      RunOnUIThreadAsync(() => {
         MarkdownWebView.CoreWebView2.PostWebMessageAsString(message);
-      }));
+        return Task.CompletedTask;
+      });
     }
 
     private void AppendMessageToLog(string message) {
-      Dispatcher.BeginInvoke((Action)(() => {
+      RunOnUIThreadAsync(() => {
         LogListBox.Items.Add($"{DateTime.Now}:\n{message}");
-      }));
+        return Task.CompletedTask;
+      });
     }
 
     #endregion UI Helpers
@@ -193,12 +207,6 @@ namespace OllamaCodeAssistant {
 
     #endregion Chat Logic
 
-    private OllamaOptionsPage GetExtensionOptions() {
-      var package = _chatToolWindow?.Package as OllamaCodeAssistantPackage;
-      var options = package?.GetDialogPage(typeof(OllamaOptionsPage)) as OllamaOptionsPage ?? throw new ApplicationException("Unable to load settings");
-      return options;
-    }
-
     private async Task PopulateModelSelectionComboBox(OllamaOptionsPage options) {
       try {
         ModelSelectionComboBox.ItemsSource = await OllamaManager.GetAvailableModelsAsync(options.OllamaApiUrl);
@@ -206,6 +214,17 @@ namespace OllamaCodeAssistant {
       } catch {
         DisplayError("Failed to load models. Please check your Ollama API URL.");
       }
+    }
+
+    private static void RunOnUIThreadAsync(Func<Task> asyncAction, [CallerMemberName] string context = null) {
+      _ = Task.Run(async () => {
+        try {
+          await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+          await asyncAction();
+        } catch (Exception ex) {
+          Debug.WriteLine($"{context ?? nameof(RunOnUIThreadAsync)} failed: {ex.GetBaseException()}");
+        }
+      });
     }
   }
 }
