@@ -238,9 +238,13 @@ namespace OllamaCodeAssistant
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                 try
                 {
+                    const int cBlockMaxSize = 100;
                     var caretPosition = _textView.Caret.Position.BufferPosition;
-                    var codeBefore = _textView.TextSnapshot.GetText(0, caretPosition.Position);
-                    var codeAfter = _textView.TextSnapshot.GetText(caretPosition.Position, _textView.TextSnapshot.Length - caretPosition.Position);
+                    var startPosition = caretPosition.Position >= cBlockMaxSize ? (caretPosition.Position - cBlockMaxSize) : 0;
+                    var blockSize = caretPosition.Position - startPosition;
+                    var codeBefore = _textView.TextSnapshot.GetText(startPosition, blockSize);
+                    blockSize = caretPosition.Position + cBlockMaxSize > _textView.TextSnapshot.Length ? _textView.TextSnapshot.Length - caretPosition.Position : cBlockMaxSize;
+                    var codeAfter = _textView.TextSnapshot.GetText(caretPosition.Position, blockSize);
 
                     // Don't suggest if text is too short or ends with space/newline
                     if (codeBefore.Length < 10 ||
@@ -298,13 +302,14 @@ namespace OllamaCodeAssistant
                     // Clean extra spaces and newlines
                     newCode = newCode.Trim();
 
+                    /*
                     // If the new code is too long, take only the first line
                     var lines = newCode.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                     if (lines.Length > 0)
                     {
                         newCode = lines[0].Trim();
                     }
-
+                    */
                     System.Diagnostics.Debug.WriteLine($"Original code: {originalCode}");
                     System.Diagnostics.Debug.WriteLine($"Full response: {response}");
                     System.Diagnostics.Debug.WriteLine($"Extracted new code: {newCode}");
@@ -320,65 +325,50 @@ namespace OllamaCodeAssistant
 
             private string RemoveCodeBlocks(string text)
             {
-                // Remove markdown code blocks (```...```)
-                var codeBlockPattern = @"```[\s\S]*?```";
-                var matches = Regex.Matches(text, codeBlockPattern);
-                if (matches.Count > 0)
+                // Pattern to match markdown code blocks (including language specifier)
+                var codeBlockPattern = @"```([^\n]*)\n([\s\S]*?)```";
+
+                // Find the first code block match in the text
+                var match = Regex.Match(text, codeBlockPattern);
+                if (match.Success && match.Groups.Count >= 3)
                 {
-                    // Take the content of the first code block
-                    var match = matches[0];
-                    var content = match.Value;
+                    // match.Groups[1] contains the language (e.g., "c++")
+                    // match.Groups[2] contains the code content inside the block
+                    var codeContent = match.Groups[2].Value;
 
-                    // Remove delimiters ``` and optional language specifier
-                    content = Regex.Replace(content, @"^```\w*\s*", "", RegexOptions.Multiline);
-                    content = Regex.Replace(content, @"```$", "", RegexOptions.Multiline);
-
-                    return content.Trim();
+                    // Return the code content, trimming any leading/trailing whitespace
+                    return codeContent.Trim();
                 }
 
-                // If no code blocks are found, return original text
+                // If no code block is found, return the original text
                 return text;
             }
 
             private string RemoveOriginalCode(string response, string originalCode)
             {
-                // If response contains original code, remove it
-                if (response.Contains(originalCode))
+                if (string.IsNullOrEmpty(response) || string.IsNullOrEmpty(originalCode))
+                    return response ?? string.Empty;
+
+                // Find the maximum possible overlap length
+                int maxOverlap = Math.Min(originalCode.Length, response.Length);
+
+                // Search for the longest overlap starting from the end of originalCode
+                for (int overlapLength = maxOverlap; overlapLength > 0; overlapLength--)
                 {
-                    int index = response.IndexOf(originalCode);
-                    if (index >= 0)
+                    string originalSuffix = originalCode.Substring(originalCode.Length - overlapLength);
+                    string responsePrefix = response.Substring(0, overlapLength);
+
+                    if (originalSuffix == responsePrefix)
                     {
-                        // Take everything after the original code
-                        string afterOriginal = response.Substring(index + originalCode.Length);
-                        return afterOriginal.Trim();
+                        // Overlap found, remove the matching part from response
+                        return response.Substring(overlapLength);
                     }
                 }
 
-                // If original code is not present, check if the response starts with part of it
-                var originalLines = originalCode.Split('\n');
-                var responseLines = response.Split('\n');
-
-                // Find where new code starts
-                int skipLines = 0;
-                for (int i = 0; i < Math.Min(originalLines.Length, responseLines.Length); i++)
-                {
-                    if (originalLines[originalLines.Length - 1 - i].Trim() == responseLines[i].Trim())
-                    {
-                        skipLines = i + 1;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                if (skipLines > 0 && skipLines < responseLines.Length)
-                {
-                    return string.Join("\n", responseLines.Skip(skipLines));
-                }
-
+                // No overlap found, return the original response
                 return response;
             }
+
         }
     }
 }
