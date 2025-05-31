@@ -104,5 +104,66 @@ namespace OllamaCodeAssistant {
       activeProject = dte?.ActiveDocument?.ProjectItem?.ContainingProject;
       return activeProject != null;
     }
+
+    public static ErrorListItem GetSelectedError() {
+      ThreadHelper.ThrowIfNotOnUIThread();
+
+      var dte = (DTE2)Package.GetGlobalService(typeof(DTE));
+      var errorItems = dte?.ToolWindows?.ErrorList?.ErrorItems;
+
+      if (errorItems != null && errorItems.Count > 0) {
+        var selectedItem = GetSelectedErrorItem(errorItems);
+
+        if (selectedItem != null) {
+          return new ErrorListItem(selectedItem);
+        }
+      }
+
+      return null; // No selected error item found
+    }
+
+    private static ErrorItem GetSelectedErrorItem(ErrorItems items) {
+      ThreadHelper.ThrowIfNotOnUIThread();
+
+      for (int i = 1; i <= items.Count; i++) // 1-based index
+      {
+        var item = items.Item(i);
+        if (!string.IsNullOrEmpty(item?.Description)) {
+          return item; // crude filter — can be refined
+        }
+      }
+
+      return null;
+    }
+
+    public class ErrorListItem {
+
+      public enum Level {
+        Message = 1,
+        Warning = 2,
+        Error = 4
+      }
+
+      public Level ErrorLevel { get; }
+
+      public string Description { get; }
+
+      public string FileName { get; }
+
+      public int Line { get; }
+
+      public int Column { get; }
+
+      public string Project { get; }
+
+      public ErrorListItem(ErrorItem errorItem) {
+        ErrorLevel = (Level)errorItem.ErrorLevel;
+        Description = errorItem.Description;
+        FileName = errorItem.FileName;
+        Line = errorItem.Line;
+        Column = errorItem.Column;
+        Project = errorItem.Project;
+      }
+    }
   }
 }

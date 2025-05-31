@@ -15,10 +15,10 @@
         defining some of the constants that we will use inside the file. -->
 
   <!--This is the file that defines the IDs for all the commands exposed by VisualStudio. -->
-  <Extern href="stdidcmd.h"/>
+  <Extern href="stdidcmd.h" />
 
   <!--This header contains the command ids for the menus provided by the shell. -->
-  <Extern href="vsshlids.h"/>
+  <Extern href="vsshlids.h" />
 
   <!--The Commands section is where commands, menus, and menu groups are defined.
       This section uses a Guid to identify the package that provides the command defined inside it. -->
@@ -30,6 +30,12 @@
     called "command set" and is used to group different command inside a logically related
     group; your package should define its own command set in order to avoid collisions
     with command ids defined by other packages. -->
+
+    <Groups>
+      <Group guid="guidOllamaCodeAssistantPackageCmdSet" id="MyContextMenuGroup" priority="0x0100">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ERRORLIST" />
+      </Group>
+    </Groups>
 
     <!--Buttons section. -->
     <!--This section defines the elements the user can interact with, like a menu command or a button
@@ -43,10 +49,18 @@
               <CommandFlag>DynamicVisibility</CommandFlag>
           If you do not want an image next to your command, remove the Icon node /> -->
       <Button guid="guidOllamaCodeAssistantPackageCmdSet" id="ChatToolWindowCommandId" priority="0x0100" type="Button">
-        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1"/>
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
         <Icon guid="guidImages" id="bmpPic1" />
         <Strings>
           <ButtonText>Ollama Code Assistant</ButtonText>
+        </Strings>
+      </Button>
+
+      <Button guid="guidOllamaCodeAssistantPackageCmdSet" id="MyErrorListContextMenuCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidOllamaCodeAssistantPackageCmdSet" id="MyContextMenuGroup" />
+        <Icon guid="guidImages" id="bmpPic1" />
+        <Strings>
+          <ButtonText>Fix with Ollama Code Assistant</ButtonText>
         </Strings>
       </Button>
     </Buttons>
@@ -58,7 +72,7 @@
             bitmap strip containing the bitmaps and then there are the numeric ids of the elements used
             inside a button definition. An important aspect of this declaration is that the element id
             must be the actual index (1-based) of the bitmap inside the bitmap strip. -->
-      <Bitmap guid="guidImages" href="Resources\ChatToolWindowCommand.png" usedList="bmpPic1, bmpPic2, bmpPicSearch, bmpPicX, bmpPicArrows, bmpPicStrikethrough"/>
+      <Bitmap guid="guidImages" href="Resources\ChatToolWindowCommand.png" usedList="bmpPic1, bmpPic2, bmpPicSearch, bmpPicX, bmpPicArrows, bmpPicStrikethrough" />
     </Bitmaps>
   </Commands>
 
@@ -69,9 +83,12 @@
     <!-- This is the guid used to group the menu commands together -->
     <GuidSymbol name="guidOllamaCodeAssistantPackageCmdSet" value="{d266ffd7-3e8a-4a56-82fa-d0b63b3471e4}">
       <IDSymbol name="ChatToolWindowCommandId" value="0x0100" />
+      <!--<IDSymbol name="cmdidExplainError" value="0x0200" />-->
+      <IDSymbol name="MyContextMenuGroup" value="0x1020" />
+      <IDSymbol name="MyErrorListContextMenuCommandId" value="0x1021" />
     </GuidSymbol>
 
-    <GuidSymbol name="guidImages" value="{0e4e3559-e12d-4fcf-b9f5-c62b42e4a76a}" >
+    <GuidSymbol name="guidImages" value="{0e4e3559-e12d-4fcf-b9f5-c62b42e4a76a}">
       <IDSymbol name="bmpPic1" value="1" />
       <IDSymbol name="bmpPic2" value="2" />
       <IDSymbol name="bmpPicSearch" value="3" />

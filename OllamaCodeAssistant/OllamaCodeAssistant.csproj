@@ -20,8 +20,8 @@
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
     <UseCodebase>true</UseCodebase>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
-    <IncludeDebugSymbolsInVSIXContainer>true</IncludeDebugSymbolsInVSIXContainer>
-    <IncludeDebugSymbolsInLocalVSIXDeployment>true</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
     <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
     <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
     <StartAction>Program</StartAction>
@@ -44,9 +44,6 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <!-- Aggiungi queste proprietà per il Release -->
-    <DebugSymbols>true</DebugSymbols>
-    <IncludeDebugSymbolsInVSIXContainer>true</IncludeDebugSymbolsInVSIXContainer>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ChatToolWindow.cs" />
@@ -57,6 +54,7 @@
     <Compile Include="DETService.cs" />
     <Compile Include="InlineSuggestionAdornment.cs" />
     <Compile Include="InlineSuggestionAdornmentFactory.cs" />
+    <Compile Include="ExecuteExplainErrorCommand.cs" />
     <Compile Include="LLMInteractionManager.cs" />
     <Compile Include="OllamaCommandFilterProvider.cs" />
     <Compile Include="OllamaManager.cs" />
@@ -134,9 +132,6 @@
     <Compile Include="OllamaCommandFilter.cs" />
     <Content Include="Resources\ChatToolWindowCommand.png" />
   </ItemGroup>
-  <ItemGroup>
-  <None Include="app.config" />
-</ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it.

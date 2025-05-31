@@ -23,5 +23,5 @@ namespace OllamaCodeAssistant
             System.Diagnostics.Debug.WriteLine("InlineSuggestionAdornmentFactory: TextViewCreated");
         }
     }
-} }
-}
+} 
+
